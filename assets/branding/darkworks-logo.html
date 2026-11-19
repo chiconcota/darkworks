@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Darkworks - Official Brand Logo & Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&family=Plus+Jakarta+Sans:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #06090e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+    }
+    .canvas-container {
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.95);
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 95vw;
+      max-height: 95vh;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .toolbar {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: #38bdf8;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas-container">
+    <canvas id="bannerCanvas" width="1920" height="1080"></canvas>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" id="downloadBtn">Tải ảnh PNG chuẩn Pixel (1920x1080)</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('bannerCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Cấu hình Layers chuẩn Ska Design App (Tương thích 100% với form tùy biến)
+    const canvasLayers = [
+      {
+        id: "brandDark",
+        type: "text",
+        content: "DARK",
+        x: 775,
+        y: 840,
+        style: {
+          font: '900 115px "Orbitron", sans-serif',
+          color: '#8494A7',
+          align: 'right'
+        }
+      },
+      {
+        id: "brandWorks",
+        type: "text",
+        content: "WORKS",
+        x: 805,
+        y: 840,
+        style: {
+          font: '900 115px "Orbitron", sans-serif',
+          color: '#34E0F9',
+          glowColor: '#00F0FF',
+          glowBlur: 45,
+          align: 'left'
+        }
+      },
+      {
+        id: "tagline",
+        type: "text",
+        content: "GPU-ACCELERATED  •  NODE-DRIVEN NLE",
+        x: 960,
+        y: 955,
+        style: {
+          font: '800 22px "Plus Jakarta Sans", sans-serif',
+          color: '#475569',
+          align: 'center',
+          letterSpacing: 8
+        }
+      }
+    ];
+
+    // Vẽ vầng hào quang tỏa tròn (Radial Glow)
+    function drawGlow(ctx, x, y, radius, color) {
+      ctx.save();
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Vẽ tia sáng lấp lánh (Lens Flare Starburst)
+    function drawStarFlare(ctx, x, y, size, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      
+      // Halo tròn
+      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 2.5);
+      halo.addColorStop(0, color);
+      halo.addColorStop(0.3, color.replace(/[\d\.]+\)$/, '0.4)'));
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tia ngang
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 15;
+      
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 3.5, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tia dọc
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.5, size * 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tia chéo 45 độ
+      ctx.rotate(Math.PI / 4);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 1.8, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tâm trắng
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawBanner() {
+      const W = canvas.width;
+      const H = canvas.height;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // 1. Cinematic Stealth Background (Vignette + Carbon texture tone)
+      const bgGrad = ctx.createRadialGradient(W / 2, 450, 80, W / 2, 540, 1100);
+      bgGrad.addColorStop(0, '#161d28');
+      bgGrad.addColorStop(0.35, '#0e131d');
+      bgGrad.addColorStop(0.7, '#07090e');
+      bgGrad.addColorStop(1, '#020306');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Fine grain noise simulation
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+      for (let i = 0; i < 4000; i++) {
+        const nx = Math.random() * W;
+        const ny = Math.random() * H;
+        ctx.fillRect(nx, ny, 1.5, 1.5);
+      }
+      ctx.restore();
+
+      // 2. Ambient Color Atmosphere Behind Constellation
+      drawGlow(ctx, 960, 420, 650, 'rgba(14, 165, 233, 0.12)');  // Cyan trung tâm
+      drawGlow(ctx, 840, 520, 480, 'rgba(168, 85, 247, 0.10)'); // Tím góc dưới trái
+      drawGlow(ctx, 1120, 420, 420, 'rgba(6, 182, 212, 0.18)'); // Neon xanh mũi nhọn
+
+      // 3. Constellation Node Graph (Play Triangle)
+      // Tọa độ tâm cụm biểu tượng: (cx: 960, cy: 430)
+      const cx = 960;
+      const cy = 425;
+      const S = 1.35; // Tỉ lệ phóng to icon
+
+      // Danh sách các điểm Node (x, y tương đối so với cx, cy)
+      const rawNodes = [
+        // Cạnh đứng bên trái (Vertical baseline)
+        { id: 'v0', x: -175 * S, y: -205 * S, r: 13, color: '#688ca8', glow: null },
+        { id: 'v1', x: -175 * S, y: -105 * S, r: 12, color: '#5b7e9b', glow: null },
+        { id: 'v2', x: -175 * S, y: 0,        r: 13, color: '#6285a2', glow: null },
+        { id: 'v3', x: -175 * S, y: 105 * S,  r: 12, color: '#7a70a8', glow: 'rgba(168, 85, 247, 0.6)' },
+        { id: 'v4', x: -175 * S, y: 205 * S,  r: 14, color: '#8b6ebd', glow: 'rgba(168, 85, 247, 0.8)' },
+
+        // Cạnh trên (Top slope)
+        { id: 't1', x: -70 * S,  y: -140 * S, r: 13, color: '#678da9', glow: null },
+        { id: 't2', x: 30 * S,   y: -75 * S,  r: 13, color: '#6696b5', glow: null },
+        { id: 't3', x: 125 * S,  y: -12 * S,  r: 14, color: '#60a5ca', glow: null },
+
+        // Cạnh dưới (Bottom slope)
+        { id: 'b1', x: -75 * S,  y: 145 * S,  r: 13, color: '#6b7da5', glow: 'rgba(129, 140, 248, 0.5)' },
+        { id: 'b2', x: 25 * S,   y: 85 * S,   r: 13, color: '#5b8eab', glow: null },
+
+        // Các Node liên kết mạng lưới bên trong (Inner Constellation Nodes)
+        { id: 'in_top_glow', x: -75 * S, y: -65 * S, r: 17, color: '#ffffff', glow: '#00F0FF', coreGlow: 35, flare: true, flareSize: 26 },
+        { id: 'in_mid_v',    x: -75 * S, y: 35 * S,  r: 12, color: '#6488a7', glow: null },
+        { id: 'in_right_glow', x: 95 * S, y: 35 * S, r: 18, color: '#ffffff', glow: '#22D3EE', coreGlow: 38, flare: true, flareSize: 28 },
+        { id: 'in_sub_mid',   x: 10 * S,  y: 5 * S,   r: 12, color: '#6293b2', glow: null },
+
+        // Đỉnh mũi nhọn bên phải (Play Apex - Siêu sáng)
+        { id: 'apex', x: 225 * S, y: 65 * S, r: 20, color: '#ffffff', glow: '#38BDF8', coreGlow: 45, flare: true, flareSize: 32 }
+      ];
+
+      // Bản đồ tìm Node theo id
+      const nodeMap = {};
+      rawNodes.forEach(n => {
+        n.absX = cx + n.x;
+        n.absY = cy + n.y;
+        nodeMap[n.id] = n;
+      });
+
+      // Danh sách các đường nối (Edges - Graph Connections)
+      const edges = [
+        // Vành ngoài tam giác
+        ['v0', 'v1'], ['v1', 'v2'], ['v2', 'v3'], ['v3', 'v4'],
+        ['v0', 't1'], ['t1', 't2'], ['t2', 't3'], ['t3', 'apex'],
+        ['v4', 'b1'], ['b1', 'b2'], ['b2', 'apex'],
+
+        // Mạng lưới đan xen bên trong (Inner Graph)
+        ['v0', 'in_top_glow'],
+        ['v1', 'in_top_glow'],
+        ['v2', 'in_top_glow'],
+        ['t1', 'in_top_glow'],
+        ['t2', 'in_top_glow'],
+        ['in_top_glow', 'in_sub_mid'],
+
+        ['v2', 'in_mid_v'],
+        ['v3', 'in_mid_v'],
+        ['v4', 'in_mid_v'],
+        ['b1', 'in_mid_v'],
+        ['in_mid_v', 'in_sub_mid'],
+
+        ['in_sub_mid', 'in_right_glow'],
+        ['t2', 'in_right_glow'],
+        ['t3', 'in_right_glow'],
+        ['b2', 'in_right_glow'],
+        ['in_right_glow', 'apex'],
+        ['t3', 'b2']
+      ];
+
+      // A. Vẽ các đường nối (Network Lines / Beams)
+      ctx.save();
+      edges.forEach(([idA, idB]) => {
+        const a = nodeMap[idA];
+        const b = nodeMap[idB];
+        if (!a || !b) return;
+
+        // Gradient màu dọc theo đường nối
+        const lineGrad = ctx.createLinearGradient(a.absX, a.absY, b.absX, b.absY);
+        const colA = a.glow ? (a.glow.startsWith('#') ? a.glow : a.glow) : 'rgba(80, 135, 175, 0.45)';
+        const colB = b.glow ? (b.glow.startsWith('#') ? b.glow : b.glow) : 'rgba(80, 135, 175, 0.45)';
+        lineGrad.addColorStop(0, colA);
+        lineGrad.addColorStop(1, colB);
+
+        // Vầng sáng đường dẫn
+        ctx.strokeStyle = lineGrad;
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = (a.glow || b.glow) ? 14 : 4;
+        ctx.beginPath();
+        ctx.moveTo(a.absX, a.absY);
+        ctx.lineTo(b.absX, b.absY);
+        ctx.stroke();
+
+        // Lõi sáng trắng mảnh bên trong
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(a.absX, a.absY);
+        ctx.lineTo(b.absX, b.absY);
+        ctx.stroke();
+      });
+      ctx.restore();
+
+      // B. Vẽ các Node vòng tròn
+      rawNodes.forEach(n => {
+        ctx.save();
+
+        // Vầng hào quang bên ngoài của Node
+        if (n.glow) {
+          drawGlow(ctx, n.absX, n.absY, n.r * 3.5, n.glow.startsWith('#') ? n.glow : n.glow);
+        }
+
+        // Thân node
+        ctx.beginPath();
+        ctx.arc(n.absX, n.absY, n.r, 0, Math.PI * 2);
+
+        if (n.coreGlow) {
+          // Node phát sáng cực mạnh (Super glowing node)
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = n.glow || '#00F0FF';
+          ctx.shadowBlur = n.coreGlow;
+          ctx.fill();
+
+          // Viền xanh ngọc
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        } else {
+          // Node tiêu chuẩn
+          ctx.fillStyle = n.color;
+          ctx.shadowColor = n.glow || 'rgba(0, 240, 255, 0.3)';
+          ctx.shadowBlur = n.glow ? 15 : 6;
+          ctx.fill();
+
+          // Điểm sáng phản quang nhẹ trên mặt node
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+
+        // Tia lóe sáng Starburst
+        if (n.flare) {
+          drawStarFlare(ctx, n.absX, n.absY, n.flareSize, n.glow || 'rgba(0, 240, 255, 0.9)');
+        }
+      });
+
+      // 4. Render Typography (DARKWORKS Wordmark)
+      canvasLayers.forEach(layer => {
+        if (layer.type === 'text') {
+          ctx.save();
+          ctx.font = layer.style.font;
+          ctx.textAlign = layer.style.align || 'center';
+          ctx.textBaseline = 'alphabetic';
+
+          if (layer.id === 'brandDark') {
+            // Hiệu ứng kim loại Titanium / Chrome mờ cho chữ DARK
+            const darkGrad = ctx.createLinearGradient(0, layer.y - 100, 0, layer.y);
+            darkGrad.addColorStop(0, '#B0C2D6');
+            darkGrad.addColorStop(0.5, '#7F91A5');
+            darkGrad.addColorStop(1, '#536375');
+            ctx.fillStyle = darkGrad;
+
+            // Đổ bóng 3D sắc cạnh
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 6;
+            ctx.fillText(layer.content, layer.x, layer.y);
+
+            // Viền kim loại nhẹ
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeText(layer.content, layer.x, layer.y);
+          } 
+          else if (layer.id === 'brandWorks') {
+            // Hiệu ứng Neon Cyan Bloom chói lóa cho chữ WORKS
+            // Lớp 1: Halo tỏa sáng rộng phía sau
+            ctx.shadowColor = layer.style.glowColor || '#00F0FF';
+            ctx.shadowBlur = layer.style.glowBlur || 45;
+            ctx.shadowOffsetY = 0;
+            ctx.fillStyle = '#22D3EE';
+            ctx.fillText(layer.content, layer.x, layer.y);
+
+            // Lớp 2: Lõi sáng trắng xanh bóng bẩy
+            const worksGrad = ctx.createLinearGradient(0, layer.y - 100, 0, layer.y);
+            worksGrad.addColorStop(0, '#E0FCFF');
+            worksGrad.addColorStop(0.45, '#38BDF8');
+            worksGrad.addColorStop(1, '#06B6D4');
+            ctx.fillStyle = worksGrad;
+            ctx.shadowColor = '#00F0FF';
+            ctx.shadowBlur = 20;
+            ctx.fillText(layer.content, layer.x, layer.y);
+          }
+          else if (layer.id === 'tagline') {
+            ctx.fillStyle = layer.style.color;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 8;
+            ctx.fillText(layer.content, layer.x, layer.y);
+          }
+
+          ctx.restore();
+        }
+      });
+    }
+
+    // Đợi font Orbitron và Plus Jakarta Sans nạp xong trước khi vẽ
+    document.fonts.ready.then(() => {
+      drawBanner();
+    });
+
+    // Nút tải ảnh PNG chuẩn pixel
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'darkworks-logo-1920x1080.png';
+      link.href = canvas.toDataURL('image/png', 1.0);
+      link.click();
+    });
+  </script>
+</body>
+</html>
