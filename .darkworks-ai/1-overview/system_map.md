@@ -87,8 +87,10 @@ darkworks/
 
 | Module / Crate | Trạng Thái | Mô Tả Chức Năng | Mục Tiêu Kế Tiếp |
 | :--- | :---: | :--- | :--- |
-| **Workspace Setup & Harness** | 🟢 Sẵn Sàng | Đã thiết lập buồng lái AI Agent, CLI audit tools, quy chế vận hành. | Khởi tạo cấu trúc `Cargo.toml`. |
-| **Media Player & Ring-Buffer** | 🔴 Chưa Làm | Lõi giải mã phần cứng GPU (VA-API), giới hạn RAM < 2GB, A/V Sync mượt. | Tích hợp lõi media từ FilmCraft base. |
+| **Workspace Setup & Harness** | 🟢 Hoàn Thành | Cargo Workspace root, resolver 2, lints thiết quân luật, apps/darkworks. | Tích hợp thêm xtask nếu cần. |
+| **Schema & Project State** | 🟢 Hoàn Thành | `crates/schema`: Tick nguyên thủy, TimeRange, ClipSlice, project.json. | Mở rộng schema cho Preset JSON. |
+| **User Interface (4 Panels)** | 🟡 Khung Sườn Sẵn Sàng | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps. | Nhúng wgpu::Texture video render thật. |
+| **Media Player & Ring-Buffer** | 🔴 Chưa Làm | Lõi giải mã phần cứng GPU (VA-API), giới hạn RAM < 2GB, A/V Sync mượt. | Tích hợp lõi media từ FilmCraft base sang `crates/media`. |
 | **Timeline NLE Core** | 🔴 Chưa Làm | Trục thời gian egui, cắt (Split), xóa (Ripple Delete), quản lý `project.json`. | Định nghĩa `ClipSlice` và Hot-Reload watcher. |
 | **Node Graph Engine (DAG)** | 🔴 Chưa Làm | Bảng nối dây `egui_snarl`, truyền `wgpu::Texture`, biên dịch shader. | Tạo 6 node nguyên tử đầu tiên (Transform, Blend, Color...). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |

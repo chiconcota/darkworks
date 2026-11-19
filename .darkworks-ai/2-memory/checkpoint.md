@@ -41,8 +41,8 @@
 ---
 
 ## 4. KẾ HOẠCH BÀN GIAO CA TIẾP THEO (NEXT ACTIONS CHECKLIST)
-Khi mở phiên kế tiếp (`/start_session`), Agent và Người Dùng sẽ bắt đầu triển khai code **Giai đoạn 1**:
-- [ ] **Bước 1:** Khởi tạo Git repository cho `darkworks` (nếu chưa có).
-- [ ] **Bước 2:** Khởi tạo `Cargo.toml` gốc cho workspace.
-- [ ] **Bước 3:** Tạo crate `crates/ui` và dựng cửa sổ giao diện 4 khu vực đầu tiên bằng `egui + wgpu`.
-- [ ] **Bước 4:** Tham chiếu sang `reference/filmcraft/crates/media` để chuẩn bị đưa lõi giải mã video phần cứng vào `crates/media`.
+Đã hoàn thành các bước nền móng của **Giai đoạn 1**:
+- [x] **Bước 1:** Khởi tạo Git repository và kết nối đồng bộ GitHub `chiconcota/darkworks`.
+- [x] **Bước 2:** Khởi tạo `Cargo.toml` gốc cho workspace với thiết quân luật `#![deny(clippy::unwrap_used, clippy::expect_used)]`.
+- [x] **Bước 3:** Hoàn thành crate `crates/schema`, `crates/ui` và app binary `apps/darkworks` dựng cửa sổ giao diện 4 khu vực bằng `egui + wgpu` (Source Bin, Viewport, Inspector, Timeline), biên dịch release 0 cảnh báo.
+- [ ] **Bước 4:** Bắt đầu triển khai `crates/media`: Tách và tích hợp lõi giải mã video phần cứng OS Native (VA-API/NVDEC) cùng Ring-Buffer LRU cache từ `reference/filmcraft/crates/media` sang.

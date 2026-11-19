@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/*",
+    "crates/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+authors = ["chiconcota <lytatthanh@gmail.com>"]
+repository = "https://github.com/chiconcota/darkworks"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[workspace.dependencies]
+# Internal Workspace Crates
+darkworks-schema = { path = "crates/schema" }
+darkworks-ui = { path = "crates/ui" }
+
+# GUI & Graphics
+egui = { version = "0.37.0", features = ["default_fonts"] }
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11"] }
+wgpu = "30.0.2"
+
+# Utilities & Async
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "fs", "time"] }
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+env_logger = "0.11"
+crossbeam-channel = "0.5"
+parking_lot = "0.12"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
