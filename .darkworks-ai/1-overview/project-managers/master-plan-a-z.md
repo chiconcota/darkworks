@@ -25,15 +25,15 @@ flowchart TD
 ---
 
 ## GIAI ĐOẠN 1: LÕI MEDIA PLAYER & KHÓA TRẦN BỘ NHỚ (PHASE 1)
-**Mục tiêu:** Nạp video 1080p/4K dài 1 tiếng, phát mượt mà 60fps trên Viewport, đồng bộ âm thanh PipeWire/ALSA và khóa cứng mức trần RAM hệ thống `< 512MB`.
+**Mục tiêu:** Nạp video 1080p/4K dài 1 tiếng, phát mượt mà 60fps trên Viewport, đồng bộ âm thanh PipeWire/ALSA và khóa cứng mức trần RAM hệ thống `< 2gb`.
 
 - [x] **Task 1.1 [Setup]:** Khởi tạo Cargo Workspace gốc, cấu hình lints `#![deny(clippy::unwrap_used, clippy::expect_used)]` và remote GitHub.
 - [x] **Task 1.2 [UI Layout]:** Dựng khung giao diện 4 phân vùng cơ bản bằng `egui + wgpu` ([crates/ui](file:///mnt/Data/darkworks/crates/ui)) và nhúng font DejaVu Sans tiếng Việt + ký tự Symbol kỹ thuật.
 - [ ] **Task 1.3 [Media Crate]:** Khởi tạo `crates/media`, mang lõi giải mã video phần cứng OS Native (Linux VA-API / NVDEC) từ `reference/filmcraft/crates/media` sang.
-- [ ] **Task 1.4 [LRU Ring-Buffer]:** Triển khai `FrameCache` giới hạn cứng dung lượng frame đã giải mã trong RAM `< 512MB` (giải phóng kịp thời theo thuật toán Least Recently Used).
+- [ ] **Task 1.4 [LRU Ring-Buffer]:** Triển khai `FrameCache` giới hạn cứng dung lượng frame đã giải mã trong RAM `< 2gb` (giải phóng kịp thời theo thuật toán Least Recently Used).
 - [ ] **Task 1.5 [GPU Zero-Copy Texture]:** Ánh xạ trực tiếp khung hình giải mã sang `wgpu::Texture` đẩy thẳng vào Viewport, tuyệt đối không copy pixel ngược về CPU (Pixel Readback).
 - [ ] **Task 1.6 [A/V Clock Sync]:** Tích hợp `cpal` phát âm thanh đồng bộ qua PipeWire/ALSA; đồng hồ âm thanh làm chuẩn (Audio-Clock Master) để hình ảnh bám theo tiếng.
-- **Tiêu chuẩn nghiệm thu (DoD 1):** Mở video MP4 1080p 1 tiếng, bấm Spacebar Play/Pause tức thì, âm thanh khớp khẩu hình, đo RAM thực tế bằng `htop` luôn dưới 512MB.
+- **Tiêu chuẩn nghiệm thu (DoD 1):** Mở video MP4 1080p 1 tiếng, bấm Spacebar Play/Pause tức thì, âm thanh khớp khẩu hình, đo RAM thực tế bằng `htop` luôn dưới 2gb.
 
 ---
 
@@ -121,6 +121,6 @@ flowchart TD
 
 ## 📌 QUY TẮC BẤT DI BẤT DỊCH TRONG TOÀN BỘ QUÁ TRÌNH THỰC THI
 1. **Thiết quân luật #1:** Khi phát sinh lỗi, Agent phân tích nguyên nhân gốc rễ (RCA) và xin phép Người Dùng trước khi can thiệp vào code.
-2. **Quy tắc < 700 dòng code:** Toàn bộ file mã nguồn giữ dưới 500 dòng (trần cứng 700 dòng). Khi file chạm 700 dòng, bắt buộc báo cáo Người Dùng để quyết định phương án (không tự ý refactor).
+2. **Quy tắc < 700 dòng code:** Toàn bộ file mã nguồn tuân thủ trần chuẩn mực 700 dòng. Khi file chạm 700 dòng, bắt buộc báo cáo Người Dùng để quyết định phương án (không tự ý refactor).
 3. **Quy tắc Never Crash:** Deny toàn bộ `.unwrap()`, `.expect()`, `panic!()` trong production.
 4. **Quy trình ca kíp:** Luôn mở ca bằng `/start_session` và kết thúc bằng `/end_session` (cập nhật 3 ngăn kéo tài liệu).

@@ -14,8 +14,9 @@ pub struct MediaAsset {
     pub codec: String,
 }
 
-/// Vẽ phân vùng Source Bin ở góc trên bên trái.
-pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
+/// Vẽ phân vùng Source Bin ở góc trên bên trái. Trả về path nếu người dùng click chọn tệp.
+pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) -> Option<String> {
+    let mut selected_path = None;
     ui.vertical(|ui| {
         // Tiêu đề phân vùng
         ui.horizontal(|ui| {
@@ -59,7 +60,7 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
                         continue;
                     }
 
-                    ui.group(|ui| {
+                    let resp = ui.group(|ui| {
                         ui.horizontal(|ui| {
                             ui.label("▶");
                             ui.vertical(|ui| {
@@ -74,10 +75,15 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
                                 );
                             });
                         });
-                    });
+                    }).response;
+
+                    if resp.interact(egui::Sense::click()).clicked() {
+                        selected_path = Some(asset.path.clone());
+                    }
                     ui.add_space(2.0);
                 }
             }
         });
     });
+    selected_path
 }

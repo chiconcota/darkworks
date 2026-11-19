@@ -25,12 +25,19 @@ panic = "deny"
 [workspace.dependencies]
 # Internal Workspace Crates
 darkworks-schema = { path = "crates/schema" }
+darkworks-media = { path = "crates/media" }
 darkworks-ui = { path = "crates/ui" }
 
 # GUI & Graphics
 egui = { version = "0.37.0", features = ["default_fonts"] }
 eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11"] }
 wgpu = "30.0.2"
+
+# Audio & Media
+cpal = "0.15"
+symphonia = { version = "0.5", features = ["all"] }
+libloading = "0.8"
+rayon = "1"
 
 # Utilities & Async
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "fs", "time"] }

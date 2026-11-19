@@ -18,7 +18,7 @@ pub fn render(
     ui.vertical(|ui| {
         // Thanh công cụ nhanh Timeline (Quick Action Toolbar)
         ui.horizontal(|ui| {
-            ui.label(RichText::new("⏱ TIMELINE").strong().size(13.0));
+            ui.label(RichText::new("◷ TIMELINE").strong().size(13.0));
             ui.separator();
 
             if ui.button("✂ Split (S)").clicked() {

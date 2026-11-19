@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 darkworks-schema = { workspace = true }
+darkworks-media = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true }
 thiserror = { workspace = true }

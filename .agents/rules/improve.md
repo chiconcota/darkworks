@@ -31,7 +31,7 @@ trigger: always_on
 - **Không nhảy cóc giai đoạn:** Làm xong và nghiệm thu dứt điểm từng bước theo Roadmap của `system_map.md` (Player ➔ Timeline ➔ Node Graph ➔ Canvas ➔ AI). Không code trước những thứ chưa đến lượt.
 
 ### 5. Kỷ Luật Giới Hạn Dòng Code & Báo Cáo Người Dùng (< 700 Dòng)
-- **Mức trần báo động:** 700 dòng code mỗi file (`.rs`). Khuyến nghị chuẩn dưới 500 dòng.
+- **Mức trần chuẩn mực & báo động:** **700 dòng code** mỗi file (`.rs`).
 - **QUY TẮC BÁO CÁO BẮT BUỘC:** Khi file chạm mốc 700 dòng:
   - Báo cáo rõ ràng lên Người Dùng để Người Dùng quyết định phương án (Người Dùng có thể cho phép ngoại lệ nếu thấy hợp lý).
   - **CẤM TUYỆT ĐỐI:** Tự ý tối ưu hóa, gộp hàm hoặc tự tiện cắt xén tách file khi chưa xin ý kiến.

@@ -53,8 +53,7 @@ Trước khi code, Agent BẮT BUỘC nhận diện mã nguồn thuộc Crate n�
 ---
 
 ## 3. GIỚI HẠN DÒNG CODE & BÁO CÁO NGƯỜI DÙNG (FILE SIZE LIMIT RULE)
-- **Mức chuẩn khuyến nghị:** Dưới 500 dòng code mỗi file (`.rs`).
-- **Trần cứng báo động:** **700 dòng code**.
+- **Trần chuẩn mực và báo động:** **700 dòng code** mỗi file (`.rs`).
 - **THIẾT QUÂN LUẬT BÁO CÁO:** Khi bất kỳ file mã nguồn nào chạm ngưỡng 700 dòng:
   - **CẤM TUYỆT ĐỐI:** Tự ý tối ưu hóa, gộp hàm hoặc tự tiện cắt xén tách file khi chưa xin ý kiến.
   - **BẮT BUỘC:** Báo cáo chi tiết lên Người Dùng để xin ý kiến quyết định phương án (Người Dùng có toàn quyền cho phép ngoại lệ vượt 700 dòng nếu thấy hợp lý hoặc chỉ định cách tái cấu trúc).

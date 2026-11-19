@@ -3,27 +3,60 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use darkworks_schema::Tick;
-use egui::{Color32, CornerRadius, Pos2, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Color32, CornerRadius, Pos2, RichText, Sense, Stroke, TextureHandle, Ui, Vec2};
+
+/// Tham số cấu hình hiển thị Viewport
+pub struct ViewportParams<'a> {
+    pub playhead: &'a mut Tick,
+    pub duration: Tick,
+    pub is_playing: &'a mut bool,
+    pub fps: f64,
+    pub video_texture: Option<&'a TextureHandle>,
+    pub vaapi_badge: Option<&'a str>,
+    pub cache_badge: Option<&'a str>,
+}
 
 /// Vẽ phân vùng Viewport ở vị trí trung tâm.
-pub fn render(
-    ui: &mut Ui,
-    playhead: &mut Tick,
-    duration: Tick,
-    is_playing: &mut bool,
-    fps: f64,
-) {
+pub fn render(ui: &mut Ui, params: ViewportParams<'_>) {
+    let playhead = params.playhead;
+    let duration = params.duration;
+    let is_playing = params.is_playing;
+    let fps = params.fps;
+    let video_texture = params.video_texture;
+    let vaapi_badge = params.vaapi_badge;
+    let cache_badge = params.cache_badge;
+
     ui.vertical(|ui| {
         // Tiêu đề & Thông số định dạng
         ui.horizontal(|ui| {
             ui.label(RichText::new("◉ PROGRAM VIEWPORT").strong().size(13.0));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+
+            if let Some(hw) = vaapi_badge {
                 ui.label(
-                    RichText::new("1920x1080 @ 60fps (Zero-Copy Texture)")
-                        .size(11.0)
-                        .color(Color32::from_rgb(148, 163, 184)),
+                    RichText::new(hw)
+                        .size(10.0)
+                        .color(Color32::from_rgb(52, 224, 249)),
                 );
-            });
+            }
+
+            // Chỉ hiển thị thông số bên phải nếu còn đủ khoảng trống (> 240px) để chống đè chữ
+            if ui.available_width() > 240.0 {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if let Some(cache_str) = cache_badge {
+                        ui.label(
+                            RichText::new(cache_str)
+                                .size(11.0)
+                                .color(Color32::from_rgb(148, 163, 184)),
+                        );
+                    } else {
+                        ui.label(
+                            RichText::new("1920x1080 @ 60fps (Zero-Copy Texture)")
+                                .size(11.0)
+                                .color(Color32::from_rgb(148, 163, 184)),
+                        );
+                    }
+                });
+            }
         });
         ui.separator();
 
@@ -52,31 +85,41 @@ pub fn render(
             egui::StrokeKind::Inside,
         );
 
-        // Điểm ngắm tâm (Center Crosshair)
-        let center = rect.center();
-        painter.line_segment(
-            [
-                Pos2::new(center.x - 12.0, center.y),
-                Pos2::new(center.x + 12.0, center.y),
-            ],
-            Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 40)),
-        );
-        painter.line_segment(
-            [
-                Pos2::new(center.x, center.y - 12.0),
-                Pos2::new(center.x, center.y + 12.0),
-            ],
-            Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 40)),
-        );
+        if let Some(tex) = video_texture {
+            // Render khung hình video GPU trực tiếp lên màn hình Viewport
+            painter.image(
+                tex.id(),
+                rect,
+                egui::Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        } else {
+            // Điểm ngắm tâm (Center Crosshair)
+            let center = rect.center();
+            painter.line_segment(
+                [
+                    Pos2::new(center.x - 12.0, center.y),
+                    Pos2::new(center.x + 12.0, center.y),
+                ],
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 40)),
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(center.x, center.y - 12.0),
+                    Pos2::new(center.x, center.y + 12.0),
+                ],
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 40)),
+            );
 
-        // Chữ Placeholder khi chưa load video texture
-        painter.text(
-            center,
-            egui::Align2::CENTER_CENTER,
-            "⚡ DARKWORKS VIEWPORT\nSẵn sàng nhận wgpu::Texture từ crates/media",
-            egui::FontId::proportional(14.0),
-            Color32::from_rgb(100, 116, 139),
-        );
+            // Chữ Placeholder khi chưa load video texture
+            painter.text(
+                center,
+                egui::Align2::CENTER_CENTER,
+                "⚡ DARKWORKS VIEWPORT\nSẵn sàng nhận wgpu::Texture từ crates/media",
+                egui::FontId::proportional(14.0),
+                Color32::from_rgb(100, 116, 139),
+            );
+        }
 
         ui.add_space(8.0);
 

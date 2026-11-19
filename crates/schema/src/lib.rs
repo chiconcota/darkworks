@@ -43,6 +43,16 @@ impl Tick {
         Self(secs.saturating_mul(TICKS_PER_SECOND))
     }
 
+    /// Tạo Tick từ số thực giây (dành cho tính toán thời gian media).
+    #[must_use]
+    pub fn from_seconds_f64(secs: f64) -> Self {
+        if secs <= 0.0 {
+            Self::ZERO
+        } else {
+            Self((secs * TICKS_PER_SECOND as f64).round() as u64)
+        }
+    }
+
     /// Tạo Tick từ chỉ số khung hình (frame index) và tốc độ khung hình (fps).
     pub fn from_frame(frame: u64, fps: f64) -> Result<Self, SchemaError> {
         if fps <= 0.0 {

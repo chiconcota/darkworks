@@ -2,6 +2,7 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use std::sync::Arc;
 use crate::panels::{
     inspector::{self, InspectorTab, TransformState},
     menu_bar,
@@ -9,7 +10,12 @@ use crate::panels::{
     timeline, viewport,
 };
 use crate::theme;
+use darkworks_media::{
+    AudioPlayer, DEFAULT_CACHE_BUDGET_BYTES, FfmpegMediaSource, FrameCache, MediaSource,
+    ProceduralMotion, VaApiStatus, probe_vaapi,
+};
 use darkworks_schema::{ClipSlice, Project, Tick, TimeRange};
+use egui::{ColorImage, TextureHandle, TextureOptions};
 
 /// Trạng thái ứng dụng desktop Darkworks.
 pub struct DarkworksApp {
@@ -24,11 +30,20 @@ pub struct DarkworksApp {
     pub media_assets: Vec<MediaAsset>,
     pub search_query: String,
 
+    // Lõi Media, Cache & Phần cứng GPU
+    pub frame_cache: Arc<FrameCache<(String, i64)>>,
+    pub audio_player: AudioPlayer,
+    pub active_source: Arc<dyn MediaSource>,
+    pub vaapi_status: VaApiStatus,
+    pub current_texture: Option<TextureHandle>,
+
     // Chỉ số hiệu năng hệ thống
     pub estimated_ram_mb: usize,
     pub frame_counter: u64,
     pub last_time_sec: f64,
     pub current_fps: f32,
+    pub last_playhead: Tick,
+    pub audio_feed_head: Tick,
 }
 
 impl DarkworksApp {
@@ -38,25 +53,34 @@ impl DarkworksApp {
         theme::apply_theme(&cc.egui_ctx);
 
         let mut project = Project::default();
-        let total_duration = Tick::from_seconds(60); // 1 phút mẫu ban đầu
 
-        // Nạp vài clip mẫu trực quan vào timeline
+        // Khởi tạo Frame Cache với trần 2GB RAM
+        let frame_cache = Arc::new(FrameCache::new(DEFAULT_CACHE_BUDGET_BYTES));
+
+        // 1. Khởi tạo nguồn phát media thực tế (1-hour Caribbean Paradise video kèm Background Prefetch)
+        let paradise_path = std::path::Path::new("assets/samples/tropical_paradise_1hour.mp4");
+        let active_source: Arc<dyn MediaSource> = if paradise_path.exists() {
+            match FfmpegMediaSource::open(paradise_path, Arc::clone(&frame_cache)) {
+                Ok(src) => Arc::new(src),
+                Err(e) => {
+                    log::warn!("Không mở được 1-hour video: {e}, fallback sang ProceduralMotion");
+                    Arc::new(ProceduralMotion::new(1280, 720, 60, 60))
+                }
+            }
+        } else {
+            Arc::new(ProceduralMotion::new(1280, 720, 60, 60))
+        };
+
+        let total_duration = active_source.info().duration;
+
+        // Nạp clip 1 tiếng thực tế vào timeline track V1
         if let Some(v1_track) = project.tracks.iter_mut().find(|t| t.id == "V1") {
             v1_track.clips.push(ClipSlice {
-                id: "clip_sample_1".to_string(),
-                name: "NASA_Launch_Apollo11.mp4".to_string(),
-                media_path: Some("/media/sample1.mp4".to_string()),
-                timeline_range: TimeRange::new(Tick::ZERO, Tick::from_seconds(15)),
-                source_range: TimeRange::new(Tick::ZERO, Tick::from_seconds(15)),
-                speed: 1.0,
-                is_muted: false,
-            });
-            v1_track.clips.push(ClipSlice {
-                id: "clip_sample_2".to_string(),
-                name: "ISS_Earth_Orbit_4K.mp4".to_string(),
-                media_path: Some("/media/sample2.mp4".to_string()),
-                timeline_range: TimeRange::new(Tick::from_seconds(15), Tick::from_seconds(30)),
-                source_range: TimeRange::new(Tick::ZERO, Tick::from_seconds(30)),
+                id: "clip_sample_1hour".to_string(),
+                name: "tropical_paradise_1hour.mp4".to_string(),
+                media_path: Some("assets/samples/tropical_paradise_1hour.mp4".to_string()),
+                timeline_range: TimeRange::new(Tick::ZERO, total_duration),
+                source_range: TimeRange::new(Tick::ZERO, total_duration),
                 speed: 1.0,
                 is_muted: false,
             });
@@ -65,9 +89,9 @@ impl DarkworksApp {
         if let Some(canvas_track) = project.tracks.iter_mut().find(|t| t.id == "V2") {
             canvas_track.clips.push(ClipSlice {
                 id: "canvas_intro_title".to_string(),
-                name: "🅰️ Vello Karaoke Title: Darkworks Intro".to_string(),
+                name: "🅰️ Vello Karaoke Title: Caribbean Paradise 4K".to_string(),
                 media_path: None,
-                timeline_range: TimeRange::new(Tick::from_seconds(2), Tick::from_seconds(10)),
+                timeline_range: TimeRange::new(Tick::from_seconds(5), Tick::from_seconds(25)),
                 source_range: TimeRange::default(),
                 speed: 1.0,
                 is_muted: false,
@@ -76,36 +100,64 @@ impl DarkworksApp {
 
         let media_assets = vec![
             MediaAsset {
-                name: "NASA_Launch_Apollo11.mp4".to_string(),
-                path: "/media/sample1.mp4".to_string(),
-                duration_str: "00:15:00".to_string(),
-                resolution: "1920x1080".to_string(),
-                codec: "H.264 / AAC".to_string(),
+                name: "tropical_paradise_1hour.mp4".to_string(),
+                path: "assets/samples/tropical_paradise_1hour.mp4".to_string(),
+                duration_str: "01:00:00:00".to_string(),
+                resolution: "640x360".to_string(),
+                codec: "H.264 / AAC (1 Hour Tropical Paradise)".to_string(),
             },
             MediaAsset {
-                name: "ISS_Earth_Orbit_4K.mp4".to_string(),
-                path: "/media/sample2.mp4".to_string(),
-                duration_str: "01:00:00".to_string(),
-                resolution: "3840x2160".to_string(),
-                codec: "HEVC Main10".to_string(),
+                name: "smpte_countdown.mp4".to_string(),
+                path: "assets/samples/smpte_countdown.mp4".to_string(),
+                duration_str: "00:00:30:00".to_string(),
+                resolution: "1280x720".to_string(),
+                codec: "H.264 / AAC (880Hz Tone)".to_string(),
+            },
+            MediaAsset {
+                name: "c_major_chord.wav".to_string(),
+                path: "assets/samples/c_major_chord.wav".to_string(),
+                duration_str: "00:00:30:00".to_string(),
+                resolution: "Audio 2ch".to_string(),
+                codec: "PCM 44.1kHz Stereo".to_string(),
             },
         ];
+
+        // Khởi tạo Audio Player
+        let audio_player = match AudioPlayer::try_new() {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("Audio player fallback: {e}");
+                AudioPlayer::dummy()
+            }
+        };
+
+        // Thăm dò khả năng giải mã phần cứng VA-API trên Linux
+        let vaapi_status = probe_vaapi();
 
         Self {
             project,
             playhead: Tick::ZERO,
             duration: total_duration,
             is_playing: false,
-            zoom_px_per_sec: 40.0,
+            zoom_px_per_sec: 2.0,
             active_inspector_tab: InspectorTab::Properties,
             transform_state: TransformState::default(),
-            selected_clip_id: Some("clip_sample_1".to_string()),
+            selected_clip_id: Some("clip_sample_1hour".to_string()),
             media_assets,
             search_query: String::new(),
-            estimated_ram_mb: 148, // Mặc định RAM ban đầu < 200MB
+
+            frame_cache,
+            audio_player,
+            active_source,
+            vaapi_status,
+            current_texture: None,
+
+            estimated_ram_mb: 48,
             frame_counter: 0,
             last_time_sec: 0.0,
             current_fps: 60.0,
+            last_playhead: Tick::ZERO,
+            audio_feed_head: Tick::ZERO,
         }
     }
 
@@ -121,12 +173,20 @@ impl DarkworksApp {
             if i.key_pressed(egui::Key::ArrowLeft) {
                 let ticks_per_frame = (darkworks_schema::TICKS_PER_SECOND as f64 / self.project.settings.fps) as u64;
                 self.playhead = Tick(self.playhead.0.saturating_sub(ticks_per_frame));
+                self.audio_player.seek(self.playhead);
+                self.audio_feed_head = self.playhead;
+                self.active_source.seek(self.playhead);
+                self.last_playhead = self.playhead;
             }
 
             // Mũi tên phải: Tiến 1 frame
             if i.key_pressed(egui::Key::ArrowRight) {
                 let ticks_per_frame = (darkworks_schema::TICKS_PER_SECOND as f64 / self.project.settings.fps) as u64;
                 self.playhead = Tick((self.playhead.0 + ticks_per_frame).min(self.duration.0));
+                self.audio_player.seek(self.playhead);
+                self.audio_feed_head = self.playhead;
+                self.active_source.seek(self.playhead);
+                self.last_playhead = self.playhead;
             }
 
             // Phím S: Split tại playhead
@@ -141,21 +201,86 @@ impl DarkworksApp {
         });
     }
 
-    /// Cập nhật nhịp thời gian phát khi đang Play.
+    /// Cập nhật nhịp thời gian phát khi đang Play và đồng bộ âm thanh.
     fn update_playback(&mut self, ctx: &egui::Context) {
-        if self.is_playing {
-            ctx.request_repaint(); // Yêu cầu vẽ liên tục 60fps khi đang phát
-            let dt = ctx.input(|i| i.stable_dt) as f64;
-            let tick_delta = (dt * darkworks_schema::TICKS_PER_SECOND as f64) as u64;
-            let next_tick = self.playhead.0 + tick_delta;
+        // 1. Đồng bộ khi người dùng Tua (Scrubbing / Seeking) từ UI
+        if self.playhead != self.last_playhead {
+            self.audio_player.seek(self.playhead);
+            self.audio_feed_head = self.playhead;
+            self.active_source.seek(self.playhead);
+            self.last_playhead = self.playhead;
+        }
 
-            if next_tick >= self.duration.0 {
-                self.playhead = self.duration;
-                self.is_playing = false;
+        // 2. Đồng bộ trạng thái Play/Pause giữa UI và Card âm thanh
+        if self.is_playing != self.audio_player.is_playing() {
+            if self.is_playing {
+                self.audio_player.seek(self.playhead);
+                self.audio_feed_head = self.playhead;
+                self.audio_player.play();
+
+                // Pre-buffer 0.5 giây âm thanh (~24.000 samples) lập tức chống buffer underrun
+                let pre_frames = (self.audio_player.sample_rate() as usize) / 2;
+                if let Ok(audio_buf) = self.active_source.audio_samples(
+                    self.audio_feed_head,
+                    pre_frames,
+                    self.audio_player.sample_rate(),
+                ) {
+                    self.audio_player.feed_samples(&audio_buf.samples);
+                    let delta_ticks = (pre_frames as u64 * darkworks_schema::TICKS_PER_SECOND)
+                        / self.audio_player.sample_rate().max(1) as u64;
+                    self.audio_feed_head = Tick(self.audio_feed_head.0 + delta_ticks);
+                }
             } else {
-                self.playhead = Tick(next_tick);
+                self.audio_player.pause();
             }
         }
+
+        // 3. Tiến trình phát thời gian thực 60fps (Audio Master Clock)
+        if self.is_playing {
+            ctx.request_repaint(); // Yêu cầu vẽ liên tục 60fps khi đang phát
+
+            if self.audio_player.has_stream() {
+                let audio_tick = self.audio_player.current_tick();
+                if audio_tick > self.playhead {
+                    self.playhead = audio_tick;
+                }
+            } else {
+                let dt = ctx.input(|i| i.stable_dt) as f64;
+                let tick_delta = (dt * darkworks_schema::TICKS_PER_SECOND as f64) as u64;
+                self.playhead = Tick(self.playhead.0 + tick_delta);
+            }
+
+            if self.playhead >= self.duration {
+                self.playhead = self.duration;
+                self.is_playing = false;
+                self.audio_player.pause();
+            }
+            self.last_playhead = self.playhead;
+
+            // 4. Luôn duy trì mức đệm âm thanh an toàn phía trước (khoảng 0.5 - 1.0 giây)
+            // Lấy mẫu tịnh tiến từ audio_feed_head để bảo đảm tính liên tục của pha sóng âm
+            let current_buf = self.audio_player.buffer_len();
+            let target_buf = (self.audio_player.sample_rate() as usize) * 2; // ~1s buffer
+            if current_buf < target_buf && self.audio_feed_head < self.duration {
+                let needed_frames = (target_buf - current_buf) / 2;
+                if needed_frames > 0 {
+                    if let Ok(audio_buf) = self.active_source.audio_samples(
+                        self.audio_feed_head,
+                        needed_frames,
+                        self.audio_player.sample_rate(),
+                    ) {
+                        self.audio_player.feed_samples(&audio_buf.samples);
+                        let delta_ticks = (needed_frames as u64 * darkworks_schema::TICKS_PER_SECOND)
+                            / self.audio_player.sample_rate().max(1) as u64;
+                        self.audio_feed_head = Tick(self.audio_feed_head.0 + delta_ticks);
+                    }
+                }
+            }
+        }
+
+        // Cập nhật thống kê RAM từ Ring-Buffer cache
+        let cache_bytes = self.frame_cache.bytes();
+        self.estimated_ram_mb = 48 + (cache_bytes / (1024 * 1024));
 
         // Tính FPS thực tế
         self.frame_counter += 1;
@@ -167,6 +292,38 @@ impl DarkworksApp {
             self.last_time_sec = now;
         }
     }
+
+    /// Lấy hoặc nạp khung hình video vào Viewport qua Ring-Buffer Cache
+    fn update_viewport_texture(&mut self, ctx: &egui::Context) {
+        let fps = self.project.settings.fps;
+        let frame_idx = (self.playhead.as_seconds_f64() * fps).round() as i64;
+        let key = (self.active_source.info().id.clone(), frame_idx);
+
+        // Báo cho Worker Thread giải mã ngầm biết vị trí playhead để duy trì prefetch đón đầu
+        self.active_source.notify_playhead(self.playhead);
+
+        let video_frame = if let Some(cached) = self.frame_cache.get(&key) {
+            cached
+        } else if let Ok(new_frame) = self.active_source.video_frame(self.playhead) {
+            self.frame_cache.insert(key, Arc::clone(&new_frame));
+            new_frame
+        } else {
+            return;
+        };
+
+        // Chuyển pixel sang RGBA8 nạp vào egui ColorImage
+        let rgba = video_frame.to_rgba8();
+        let color_image = ColorImage::from_rgba_unmultiplied(
+            [video_frame.width as usize, video_frame.height as usize],
+            &rgba,
+        );
+
+        self.current_texture = Some(ctx.load_texture(
+            "viewport_video_frame",
+            color_image,
+            TextureOptions::LINEAR,
+        ));
+    }
 }
 
 impl eframe::App for DarkworksApp {
@@ -175,6 +332,7 @@ impl eframe::App for DarkworksApp {
         let fps = self.project.settings.fps;
         self.handle_shortcuts(&ctx);
         self.update_playback(&ctx);
+        self.update_viewport_texture(&ctx);
 
         // 1. Top Panel: Menu Bar & Status
         egui::Panel::top("top_menu_panel")
@@ -184,6 +342,7 @@ impl eframe::App for DarkworksApp {
                     ui,
                     &self.project.name,
                     self.estimated_ram_mb,
+                    self.frame_cache.budget() / (1024 * 1024),
                     self.current_fps,
                 );
             });
@@ -211,7 +370,19 @@ impl eframe::App for DarkworksApp {
             .min_size(200.0)
             .default_size(280.0)
             .show(ui, |ui| {
-                source_bin::render(ui, &self.media_assets, &mut self.search_query);
+                if let Some(clicked_path) = source_bin::render(ui, &self.media_assets, &mut self.search_query) {
+                    let path = std::path::Path::new(&clicked_path);
+                    if path.exists() {
+                        if let Ok(new_src) = FfmpegMediaSource::open(path, Arc::clone(&self.frame_cache)) {
+                            self.duration = new_src.info().duration;
+                            self.active_source = Arc::new(new_src);
+                            self.playhead = Tick::ZERO;
+                            self.audio_feed_head = Tick::ZERO;
+                            self.audio_player.seek(Tick::ZERO);
+                            self.frame_cache.clear();
+                        }
+                    }
+                }
             });
 
         // 4. Right Panel: Inspector & Node Graph DAG
@@ -230,13 +401,32 @@ impl eframe::App for DarkworksApp {
             });
 
         // 5. Central Panel: Viewport 16:9
+        let vaapi_badge = if self.vaapi_status.available {
+            Some("⚡ VA-API: Hardware Accelerated")
+        } else {
+            Some("⚙ CPU Fallback")
+        };
+
+        let stats = self.frame_cache.stats();
+        let cache_str = format!(
+            "RAM: {}MB / {}MB | Hits: {}",
+            stats.bytes / (1024 * 1024),
+            stats.budget / (1024 * 1024),
+            stats.hits
+        );
+
         egui::CentralPanel::default().show(ui, |ui| {
             viewport::render(
                 ui,
-                &mut self.playhead,
-                self.duration,
-                &mut self.is_playing,
-                self.project.settings.fps,
+                viewport::ViewportParams {
+                    playhead: &mut self.playhead,
+                    duration: self.duration,
+                    is_playing: &mut self.is_playing,
+                    fps,
+                    video_texture: self.current_texture.as_ref(),
+                    vaapi_badge,
+                    cache_badge: Some(&cache_str),
+                },
             );
         });
     }

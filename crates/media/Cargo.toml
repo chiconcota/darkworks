@@ -1,0 +1,26 @@
+[package]
+name = "darkworks-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "GPU-accelerated media engine, hardware VA-API video decoding, byte-budgeted LRU cache, and A/V sync for Darkworks"
+
+[dependencies]
+darkworks-schema = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+cpal = { workspace = true }
+symphonia = { workspace = true }
+libloading = { workspace = true }
+rayon = { workspace = true }
+image = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+
+[lints]
+workspace = true

@@ -54,7 +54,7 @@ Trước khi code, Agent BẮT BUỘC nhận diện mã nguồn thuộc Crate n�
   - Không phân bổ bộ nhớ mới (`alloc`) trong vòng lặp Render 60fps. Sử dụng bộ nhớ đệm tái sử dụng (Ring-Buffer, Staging Buffer).
   - Khung hình đã giải mã phải giải phóng kịp thời theo thuật toán LRU (Least Recently Used), khóa cứng mức trần RAM `< 512MB`.
 - **Giới hạn dòng code & Báo cáo Người Dùng (< 700 dòng):**
-  - Mọi file mã nguồn chuẩn mực dưới 500 dòng, trần tối đa **700 dòng**.
+  - Mọi file mã nguồn tuân thủ trần chuẩn mực tối đa **700 dòng**.
   - **BẮT BUỘC:** Khi file chạm ngưỡng 700 dòng, Agent phải dừng lại báo cáo Người Dùng để quyết định phương án; tuyệt đối không tự động tái cấu trúc hay tối ưu hóa bừa bãi. Người Dùng có thể cho phép ngoại lệ nếu thấy cần thiết.
   - Kiểm toán tự động qua tool `.agents/harness/check_file_size.py`.
 

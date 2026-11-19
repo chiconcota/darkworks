@@ -5,7 +5,7 @@
 use egui::{Color32, RichText, Ui, containers::menu::MenuBar};
 
 /// Vẽ thanh menu chính phía trên cùng của ứng dụng.
-pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, fps: f32) {
+pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, budget_mb: usize, fps: f32) {
     MenuBar::new().ui(ui, |ui| {
         ui.horizontal(|ui| {
             // Logo / Tên thương hiệu
@@ -75,11 +75,11 @@ pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, fps: f32) {
 
             // Tiêu đề dự án hiện tại
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // Chỉ số bộ nhớ (Khóa trần RAM < 512MB)
-                let ram_color = if ram_mb > 450 {
-                    Color32::from_rgb(239, 68, 68) // Đỏ cảnh báo
-                } else if ram_mb > 350 {
-                    Color32::from_rgb(245, 158, 11) // Vàng
+                // Chỉ số bộ nhớ (Khóa trần RAM < 2GB theo Khẩu quyết #1, Mức 1: 1024MB)
+                let ram_color = if ram_mb >= 1900 {
+                    Color32::from_rgb(239, 68, 68) // Đỏ cảnh báo (> 1.9GB)
+                } else if ram_mb >= budget_mb.saturating_sub(64) {
+                    Color32::from_rgb(245, 158, 11) // Vàng tiệm cận budget (ví dụ 1GB)
                 } else {
                     Color32::from_rgb(16, 185, 129) // Xanh lá an toàn
                 };
@@ -92,7 +92,7 @@ pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, fps: f32) {
                 ui.separator();
 
                 ui.label(
-                    RichText::new(format!("RAM: {ram_mb}MB / 512MB Cap"))
+                    RichText::new(format!("RAM: {ram_mb}MB / {budget_mb}MB (2GB Cap)"))
                         .size(11.0)
                         .color(ram_color),
                 );

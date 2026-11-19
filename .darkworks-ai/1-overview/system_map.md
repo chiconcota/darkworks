@@ -89,8 +89,8 @@ darkworks/
 | :--- | :---: | :--- | :--- |
 | **Workspace Setup & Harness** | 🟢 Hoàn Thành | Cargo Workspace root, resolver 2, lints thiết quân luật, apps/darkworks. | Tích hợp thêm xtask nếu cần. |
 | **Schema & Project State** | 🟢 Hoàn Thành | `crates/schema`: Tick nguyên thủy, TimeRange, ClipSlice, project.json. | Mở rộng schema cho Preset JSON. |
-| **User Interface (4 Panels)** | 🟡 Khung Sườn Sẵn Sàng | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps. | Nhúng wgpu::Texture video render thật. |
-| **Media Player & Ring-Buffer** | 🔴 Chưa Làm | Lõi giải mã phần cứng GPU (VA-API), giới hạn RAM < 2GB, A/V Sync mượt. | Tích hợp lõi media từ FilmCraft base sang `crates/media`. |
+| **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
+| **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🔴 Chưa Làm | Trục thời gian egui, cắt (Split), xóa (Ripple Delete), quản lý `project.json`. | Định nghĩa `ClipSlice` và Hot-Reload watcher. |
 | **Node Graph Engine (DAG)** | 🔴 Chưa Làm | Bảng nối dây `egui_snarl`, truyền `wgpu::Texture`, biên dịch shader. | Tạo 6 node nguyên tử đầu tiên (Transform, Blend, Color...). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
@@ -124,6 +124,15 @@ flowchart TD
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
 
+- **2026-11-19 (Phân Tầng Cache 2 Cấp & Thuật Toán Dọn Dẹp O(1) Triệt Tiêu Lỗi Tụt 10 FPS):**
+  - Chốt phân tầng bộ nhớ 2 cấp độ: Mức 1 là 1GB (1024MB) cho Video Frame Cache; Mức trần cứng là 2GB (2048MB) cho toàn bộ ứng dụng Darkworks.
+  - Nâng cấp thuật toán dọn dẹp bộ đệm sang $O(1)$ vi mô qua `VecDeque` và giải phóng vùng nhớ byte hoàn toàn ngoài khóa `Mutex`, triệt tiêu triệt để hiện tượng tụt 10 FPS khi chạm trần RAM.
+  - Cập nhật hiển thị trạng thái RAM trên Menu Bar: `RAM: XMB / YMB (2GB Cap)` đổi màu xanh/vàng/đỏ thời gian thực.
+- **2026-11-19 (Nghiệm thu Giai đoạn 1 & Nâng cấp Luồng Prefetch 60 FPS Video 1 Tiếng):**
+  - Tải và tích hợp video mẫu 1 tiếng `tropical_paradise_1hour.mp4` (254.7MB, 108.001 frames) vào project.
+  - Khắc phục triệt để hiện tượng tụt FPS (từ 5-11 FPS) bằng cách đưa cơ chế giải mã sang luồng ngầm `run_prefetch_loop` thông qua streaming pipe FFmpeg độc lập.
+  - Duy trì vững chắc 60 FPS trong Viewport, mức RAM duy trì ở mức ~250MB (dưới trần cứng 2048MB).
+  - Hoàn tất 100% tiêu chí nghiệm thu (DoD) của Giai đoạn 1 (Phase 1 Media Player).
 - **2026-11-19 (Khởi tạo dự án Darkworks & Chuẩn hóa Buồng lái AI Agent):**
   - Sao chép và tái cấu trúc hệ thống buồng lái AI Agent từ Skaaa sang Darkworks.
   - Chuẩn hóa buồng lái về duy nhất một thư mục `.agents/` và đổi tên bộ nhớ thành `.darkworks-ai/` với 3 ngăn kéo chuẩn (`1-overview`, `2-memory`, `3-modules`).

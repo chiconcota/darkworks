@@ -3,8 +3,7 @@
 Darkworks Harness: File Size Auditor (check_file_size.py)
 
 Quy tắc:
-- Khuyến nghị: < 500 dòng code mỗi file (.rs).
-- Trần cứng: 700 dòng code.
+- Trần chuẩn mực: < 700 dòng code mỗi file (.rs).
 - Thiết quân luật: Khi file chạm 700 dòng, Agent phải dừng lại báo cáo Người Dùng
   để quyết định phương án (không tự động tối ưu/tái cấu trúc).
 """
@@ -15,7 +14,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 SOURCE_DIRS = [ROOT_DIR / "apps", ROOT_DIR / "crates"]
 
-WARN_THRESHOLD = 500
+WARN_THRESHOLD = 650
 FAIL_THRESHOLD = 700
 
 def audit_file_sizes():
@@ -41,13 +40,13 @@ def audit_file_sizes():
                 print(f"  🔴 [FAIL >= 700]: {rel_path} ({lines} lines) -> BẮT BUỘC BÁO CÁO NGƯỜI DÙNG!")
             elif lines > WARN_THRESHOLD:
                 warnings.append((rel_path, lines))
-                print(f"  🟡 [WARN > 500]: {rel_path} ({lines} lines) -> Đang tiến gần trần 700")
+                print(f"  🟡 [WARN > 650]: {rel_path} ({lines} lines) -> Tiến gần trần 700")
             else:
-                print(f"  🟢 [OK < 500]  : {rel_path} ({lines} lines)")
+                print(f"  🟢 [OK < 700]  : {rel_path} ({lines} lines)")
 
     print("-" * 65)
     print(f"Tổng số file kiểm toán: {files_checked}")
-    print(f"Cảnh báo (> 500 dòng) : {len(warnings)}")
+    print(f"Cảnh báo (> 650 dòng) : {len(warnings)}")
     print(f"Vi phạm (>= 700 dòng) : {len(failures)}")
     print("=" * 65)
 

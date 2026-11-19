@@ -10,3 +10,9 @@ reference/
 Thumbs.db
 .vscode/
 .idea/
+
+# Large media samples (> 100MB exceeds GitHub push limit)
+assets/samples/*.mp4
+assets/samples/*.mkv
+assets/samples/*.mov
+assets/samples/*.wav
