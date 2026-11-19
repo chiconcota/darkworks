@@ -14,11 +14,11 @@
 
 ## 2. CHECKLIST CÁC ĐẦU VIỆC CỤ THỂ
 
-- [ ] **Task 1.1:** Khởi tạo Cargo Workspace gốc của Darkworks.
-- [ ] **Task 1.2:** Dựng Crate `crates/ui` mở được cửa sổ `egui` có 4 phân vùng cơ bản (Source Bin, Viewport, Inspector, Timeline rỗng).
-- [ ] **Task 1.3:** Tách module giải mã video phần cứng từ FilmCraft sang `crates/media`.
-- [ ] **Task 1.4:** Render khung hình video giải mã lên `wgpu::Texture` trong Viewport (Zero-copy).
-- [ ] **Task 1.5:** Triển khai Ring-Buffer LRU cache, kiểm tra mức chiếm dụng RAM bằng `htop` / `ps` khi phát video dài 1 tiếng.
+- [x] **Task 1.1:** Khởi tạo Cargo Workspace gốc của Darkworks, cấu hình lints `#![deny(clippy::unwrap_used, clippy::expect_used)]` và đồng bộ GitHub.
+- [x] **Task 1.2:** Dựng Crate `crates/ui` + `apps/darkworks` mở cửa sổ `egui + wgpu` có 4 phân vùng cơ bản (Source Bin, Viewport, Inspector, Timeline rỗng) kèm font DejaVu Sans tiếng Việt và ký tự Symbol chuẩn.
+- [ ] **Task 1.3:** Khởi tạo `crates/media`, tách module giải mã video phần cứng OS Native (Linux VA-API / NVDEC) từ FilmCraft sang.
+- [ ] **Task 1.4:** Triển khai Ring-Buffer LRU cache (`FrameCache`), giới hạn cứng dung lượng RAM < 512MB.
+- [ ] **Task 1.5:** Render khung hình video giải mã lên `wgpu::Texture` trong Viewport (Zero-copy).
 - [ ] **Task 1.6:** Tích hợp `cpal` phát audio track đồng bộ với khung hình video khi bấm Spacebar (Play/Pause).
 
 ---
