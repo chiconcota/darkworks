@@ -49,3 +49,9 @@
   - **Node Text / Subtitle (Generator Node):** Chuyên text string, font, size, alignment, karaoke color sync theo tick.
   - **Node Shape / Vector (Generator Node):** Chuyên vẽ hình khối cơ bản (Rectangle, Circle, Star), hỗ trợ import file `.svg` vector sắc nét.
   - **Node Canvas Group (Composite Node):** Đóng gói cụm nhiều layer text + shape (ví dụ: Lower-third tin tức) thành một preset JSON duy nhất.
+
+### 10. Giới Hạn Dòng Code (< 700 Dòng) & Quy Trình Báo Cáo Người Dùng
+- **Mức chuẩn:** Khuyến nghị dưới 500 dòng code mỗi file `.rs`.
+- **Trần cứng báo động:** **700 dòng code**.
+- **Quy tắc tuyệt đối:** Khi file chạm mốc 700 dòng, Agent phải dừng lại báo cáo chi tiết cho Người Dùng để xin ý kiến quyết định phương án (tách module hoặc cấp phép ngoại lệ nếu thấy cần thiết). Tuyệt đối không tự tiện tối ưu hay cắt xén code.
+- **Công cụ kiểm toán:** Tích hợp script kiểm tra tại `.agents/harness/check_file_size.py`.

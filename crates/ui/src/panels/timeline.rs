@@ -18,7 +18,7 @@ pub fn render(
     ui.vertical(|ui| {
         // Thanh công cụ nhanh Timeline (Quick Action Toolbar)
         ui.horizontal(|ui| {
-            ui.label(RichText::new("⏱️ TIMELINE").strong().size(13.0));
+            ui.label(RichText::new("⏱ TIMELINE").strong().size(13.0));
             ui.separator();
 
             if ui.button("✂ Split (S)").clicked() {
@@ -29,18 +29,18 @@ pub fn render(
                 log::info!("Kích hoạt AI Auto Cut Silence");
             }
 
-            if ui.button("💬 Auto Subtitle (Whisper)").clicked() {
+            if ui.button("¶ Auto Subtitle (Whisper)").clicked() {
                 log::info!("Kích hoạt AI Auto Subtitle");
             }
 
-            if ui.button("🗑 Ripple Delete (X)").clicked() {
+            if ui.button("✕ Ripple Delete (X)").clicked() {
                 log::info!("Thực hiện lệnh Ripple Delete");
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(
                     egui::Slider::new(zoom_px_per_sec, 10.0..=300.0)
-                        .text("🔍 Zoom")
+                        .text("⚲ Zoom")
                         .suffix(" px/s"),
                 );
             });

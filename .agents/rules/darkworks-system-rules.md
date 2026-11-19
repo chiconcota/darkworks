@@ -52,9 +52,13 @@ Trước khi code, Agent BẮT BUỘC nhận diện mã nguồn thuộc Crate n�
 
 ---
 
-## 3. GIỚI HẠN DÒNG CODE (FILE SIZE LIMIT)
-- Khuyến nghị tối đa: 500 dòng code mỗi file.
-- Tuyệt đối không để file vượt quá 700 dòng. Khi tiến gần mốc này, bắt buộc tách thành các submodule nhỏ hơn.
+## 3. GIỚI HẠN DÒNG CODE & BÁO CÁO NGƯỜI DÙNG (FILE SIZE LIMIT RULE)
+- **Mức chuẩn khuyến nghị:** Dưới 500 dòng code mỗi file (`.rs`).
+- **Trần cứng báo động:** **700 dòng code**.
+- **THIẾT QUÂN LUẬT BÁO CÁO:** Khi bất kỳ file mã nguồn nào chạm ngưỡng 700 dòng:
+  - **CẤM TUYỆT ĐỐI:** Tự ý tối ưu hóa, gộp hàm hoặc tự tiện cắt xén tách file khi chưa xin ý kiến.
+  - **BẮT BUỘC:** Báo cáo chi tiết lên Người Dùng để xin ý kiến quyết định phương án (Người Dùng có toàn quyền cho phép ngoại lệ vượt 700 dòng nếu thấy hợp lý hoặc chỉ định cách tái cấu trúc).
+- **Công cụ kiểm toán:** Chạy `python3 .agents/harness/check_file_size.py` trước mọi phiên bàn giao (/end_session).
 
 ---
 

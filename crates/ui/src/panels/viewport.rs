@@ -16,7 +16,7 @@ pub fn render(
     ui.vertical(|ui| {
         // Tiêu đề & Thông số định dạng
         ui.horizontal(|ui| {
-            ui.label(RichText::new("🖥️ PROGRAM VIEWPORT").strong().size(13.0));
+            ui.label(RichText::new("◉ PROGRAM VIEWPORT").strong().size(13.0));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
                     RichText::new("1920x1080 @ 60fps (Zero-Copy Texture)")

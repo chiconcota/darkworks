@@ -2,7 +2,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use egui::{Color32, CornerRadius, Stroke, Visuals};
+use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Stroke, Visuals};
+use std::sync::Arc;
 
 pub const COLOR_BG_DARK: Color32 = Color32::from_rgb(10, 14, 20);
 pub const COLOR_PANEL_BG: Color32 = Color32::from_rgb(15, 20, 28);
@@ -19,6 +20,7 @@ pub const COLOR_PLAYHEAD: Color32 = Color32::from_rgb(239, 68, 68);
 
 /// Thiết lập giao diện tối ưu chuẩn NLE chuyên nghiệp cho egui Context.
 pub fn apply_theme(ctx: &egui::Context) {
+    // 1. Bảng màu Dark Sci-Fi
     let mut visuals = Visuals::dark();
     visuals.panel_fill = COLOR_PANEL_BG;
     visuals.window_fill = COLOR_PANEL_BG;
@@ -43,4 +45,21 @@ pub fn apply_theme(ctx: &egui::Context) {
     visuals.widgets.active.corner_radius = CornerRadius::same(4);
 
     ctx.set_visuals(visuals);
+
+    // 2. Nạp font DejaVu Sans (Đảm bảo 100% hiển thị tiếng Việt và ký tự Symbol chuẩn)
+    let mut fonts = FontDefinitions::default();
+    let font_bytes = include_bytes!("../../../assets/fonts/DejaVuSans.ttf");
+    fonts.font_data.insert(
+        "DejaVuSans".to_owned(),
+        Arc::new(FontData::from_static(font_bytes)),
+    );
+
+    if let Some(vec) = fonts.families.get_mut(&FontFamily::Proportional) {
+        vec.insert(0, "DejaVuSans".to_owned());
+    }
+    if let Some(vec) = fonts.families.get_mut(&FontFamily::Monospace) {
+        vec.push("DejaVuSans".to_owned());
+    }
+
+    ctx.set_fonts(fonts);
 }

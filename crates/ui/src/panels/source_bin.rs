@@ -19,9 +19,9 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
     ui.vertical(|ui| {
         // Tiêu đề phân vùng
         ui.horizontal(|ui| {
-            ui.label(RichText::new("📁 PROJECT BIN").strong().size(13.0));
+            ui.label(RichText::new("▤ PROJECT BIN").strong().size(13.0));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("➕ Import").clicked() {
+                if ui.button("+ Import").clicked() {
                     log::info!("Mở hộp thoại nhập tài nguyên media");
                 }
             });
@@ -30,7 +30,7 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
 
         // Ô tìm kiếm tài nguyên
         ui.horizontal(|ui| {
-            ui.label("🔍");
+            ui.label("⚲");
             ui.text_edit_singleline(search_query);
         });
         ui.add_space(4.0);
@@ -46,7 +46,7 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
                             .italics(),
                     );
                     ui.label(
-                        RichText::new("Kéo thả video vào đây hoặc bấm ➕ Import")
+                        RichText::new("Kéo thả video vào đây hoặc bấm + Import")
                             .size(11.0)
                             .color(Color32::from_rgb(100, 116, 139)),
                     );
@@ -61,7 +61,7 @@ pub fn render(ui: &mut Ui, assets: &[MediaAsset], search_query: &mut String) {
 
                     ui.group(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label("🎬");
+                            ui.label("▶");
                             ui.vertical(|ui| {
                                 ui.label(RichText::new(&asset.name).strong());
                                 ui.label(

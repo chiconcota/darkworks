@@ -18,34 +18,34 @@ pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, fps: f32) {
 
             // Menu File
             ui.menu_button("File", |ui| {
-                if ui.button("📄 New Project (Ctrl+N)").clicked() {
+                if ui.button("+ New Project (Ctrl+N)").clicked() {
                     ui.close();
                 }
-                if ui.button("📂 Open Project... (Ctrl+O)").clicked() {
+                if ui.button("▤ Open Project... (Ctrl+O)").clicked() {
                     ui.close();
                 }
-                if ui.button("💾 Save Project (Ctrl+S)").clicked() {
+                if ui.button("◆ Save Project (Ctrl+S)").clicked() {
                     ui.close();
                 }
                 ui.separator();
-                if ui.button("❌ Exit").clicked() {
+                if ui.button("✕ Exit").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
 
             // Menu Edit
             ui.menu_button("Edit", |ui| {
-                if ui.button("↩ Undo (Ctrl+Z)").clicked() {
+                if ui.button("◀ Undo (Ctrl+Z)").clicked() {
                     ui.close();
                 }
-                if ui.button("↪ Redo (Ctrl+Y)").clicked() {
+                if ui.button("▶ Redo (Ctrl+Y)").clicked() {
                     ui.close();
                 }
                 ui.separator();
                 if ui.button("✂ Split at Playhead (S)").clicked() {
                     ui.close();
                 }
-                if ui.button("🗑 Ripple Delete (X)").clicked() {
+                if ui.button("✕ Ripple Delete (X)").clicked() {
                     ui.close();
                 }
             });
@@ -106,7 +106,7 @@ pub fn render(ui: &mut Ui, project_name: &str, ram_mb: usize, fps: f32) {
                 ui.separator();
 
                 ui.label(
-                    RichText::new(format!("📁 {project_name}"))
+                    RichText::new(format!("▤ {project_name}"))
                         .size(12.0)
                         .strong()
                         .color(Color32::from_rgb(226, 232, 240)),

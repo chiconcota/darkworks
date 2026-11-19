@@ -44,10 +44,10 @@ pub fn render(
     selected_clip: Option<&str>,
 ) {
     ui.vertical(|ui| {
-        // Tab chuyển đổi chế độ
+        // Tab chuyển đổi chế độ (Dùng symbol chuẩn)
         ui.horizontal(|ui| {
-            ui.selectable_value(active_tab, InspectorTab::Properties, "⚙️ Properties");
-            ui.selectable_value(active_tab, InspectorTab::NodeGraph, "🕸️ Node Graph (DAG)");
+            ui.selectable_value(active_tab, InspectorTab::Properties, "⚙ Properties");
+            ui.selectable_value(active_tab, InspectorTab::NodeGraph, "◈ Node Graph (DAG)");
         });
         ui.separator();
 
@@ -67,8 +67,8 @@ fn render_properties_tab(
         ui.label(RichText::new(format!("Đang chọn: {clip_name}")).strong().color(Color32::from_rgb(52, 224, 249)));
         ui.add_space(8.0);
 
-        // Nhóm biến hình (Transform)
-        ui.collapsing("📐 Transform (Chuyển động)", |ui| {
+        // Nhóm biến hình (Transform - dùng symbol ∡)
+        ui.collapsing("∡ Transform (Chuyển động)", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Vị trí X:");
                 ui.add(egui::DragValue::new(&mut transform.pos_x).speed(1.0).suffix(" px"));
@@ -87,8 +87,8 @@ fn render_properties_tab(
             });
         });
 
-        // Nhóm hòa trộn (Compositing & Opacity)
-        ui.collapsing("🎨 Compositing (Độ mờ & Hòa trộn)", |ui| {
+        // Nhóm hòa trộn (Compositing - dùng symbol ◐)
+        ui.collapsing("◐ Compositing (Độ mờ & Hòa trộn)", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Độ mờ (Opacity):");
                 ui.add(egui::Slider::new(&mut transform.opacity, 0.0..=100.0).suffix("%"));
@@ -136,11 +136,11 @@ fn render_nodegraph_tab(ui: &mut Ui) {
         // Khung đồ họa minh họa node
         ui.group(|ui| {
             ui.horizontal(|ui| {
-                ui.label("🎬 [Video Input]");
+                ui.label("▶ [Video Input]");
                 ui.label("➔");
-                ui.label("📐 [Transform]");
+                ui.label("∡ [Transform]");
                 ui.label("➔");
-                ui.label("🖥️ [Output]");
+                ui.label("◉ [Output]");
             });
         });
 

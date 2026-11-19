@@ -21,3 +21,8 @@ Trong Darkworks, toàn bộ quá trình kiểm toán mã nguồn, kiểm tra ran
    ```bash
    cargo xtask layers
    ```
+
+5. **Kiểm toán độ dài file mã nguồn (< 700 dòng code):**
+   ```bash
+   python3 .agents/harness/check_file_size.py
+   ```
