@@ -1,0 +1,31 @@
+# KẾ HOẠCH DỰ ÁN: GIAI ĐOẠN 1 (phase-1-media-player.md)
+@project: DARKWORKS | @phase: 1 | @status: 🟡 Ready to Implement
+@goal: Load video 1 tiếng, phát mượt mà 60fps, âm thanh đồng bộ và khóa cứng trần RAM < 2GB.
+
+---
+
+## 1. MỤC TIÊU CỐT LÕI (CORE DELIVERABLES)
+1. **Khởi tạo cửa sổ ứng dụng 4 khu vực (`crates/ui`):** Dùng `egui + eframe + wgpu`.
+2. **Khảo sát & Tích hợp Lõi Media (`crates/media`):** Tận dụng bộ giải mã phần cứng VA-API từ `reference/filmcraft/crates/media` và `platform`.
+3. **Cơ chế Ring-Buffer LRU Cache:** Giới hạn cứng bộ nhớ đệm khung hình `< 2GB RAM (2048MB)`. Không bao giờ tích trữ frame tràn lan như Blender VSE.
+4. **Đồng bộ Âm thanh & Hình ảnh (A/V Sync):** Dùng `cpal` phát âm thanh chuẩn qua PipeWire/ALSA, hình ảnh bám theo nhịp quét màn hình.
+
+---
+
+## 2. CHECKLIST CÁC ĐẦU VIỆC CỤ THỂ
+
+- [ ] **Task 1.1:** Khởi tạo Cargo Workspace gốc của Darkworks.
+- [ ] **Task 1.2:** Dựng Crate `crates/ui` mở được cửa sổ `egui` có 4 phân vùng cơ bản (Source Bin, Viewport, Inspector, Timeline rỗng).
+- [ ] **Task 1.3:** Tách module giải mã video phần cứng từ FilmCraft sang `crates/media`.
+- [ ] **Task 1.4:** Render khung hình video giải mã lên `wgpu::Texture` trong Viewport (Zero-copy).
+- [ ] **Task 1.5:** Triển khai Ring-Buffer LRU cache, kiểm tra mức chiếm dụng RAM bằng `htop` / `ps` khi phát video dài 1 tiếng.
+- [ ] **Task 1.6:** Tích hợp `cpal` phát audio track đồng bộ với khung hình video khi bấm Spacebar (Play/Pause).
+
+---
+
+## 3. TIÊU CHUẨN NGHIỆM THU GIAI ĐOẠN 1 (DEFINITION OF DONE)
+- [ ] Mở ứng dụng Darkworks phát được 1 file video MP4 1080p dài 1 tiếng.
+- [ ] Mức ăn RAM đo được không vượt quá **2GB (2048MB)**.
+- [ ] Bấm Spacebar để Play / Pause tức thì, âm thanh khớp khẩu hình tuyệt đối.
+- [ ] Tua thanh Playhead (Scrubbing) phản hồi nhanh, không bị đơ giật giao diện.
+- [ ] Mã nguồn vượt qua kiểm tra `cargo check` và `cargo clippy` không có cảnh báo.

@@ -1,0 +1,12 @@
+# Rust target
+target/
+
+# Reference repos (untouched source code)
+reference/
+/reference/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
