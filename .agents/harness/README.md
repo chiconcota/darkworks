@@ -23,7 +23,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-### 4. Kiểm toán độ dài file mã nguồn (< 700 dòng code):
+### 4. Kiểm toán hệ thống & độ dài file mã nguồn (< 700 dòng code):
 ```bash
-python3 .agents/harness/check_file_size.py
+python3 .agents/harness/audit.py
 ```

@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "name": "Untitled Project",
+  "settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "sample_rate": 48000
+  },
+  "tracks": [
+    {
+      "id": "V2",
+      "name": "Canvas 2D / Subtitles",
+      "kind": "Canvas",
+      "is_locked": false,
+      "is_hidden": false,
+      "clips": [
+        {
+          "id": "canvas_intro_title",
+          "name": "🅰️ Vello Karaoke Title: Caribbean Paradise 4K",
+          "media_path": null,
+          "timeline_range": {
+            "start": 1270080000000,
+            "duration": 6350400000000
+          },
+          "source_range": {
+            "start": 0,
+            "duration": 0
+          },
+          "speed": 1.0,
+          "is_muted": false
+        }
+      ]
+    },
+    {
+      "id": "V1",
+      "name": "Video 1",
+      "kind": "Video",
+      "is_locked": false,
+      "is_hidden": false,
+      "clips": [
+        {
+          "id": "clip_sample_1hour",
+          "name": "tropical_paradise_1hour.mp4",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 0,
+            "duration": 18157182750000
+          },
+          "source_range": {
+            "start": 0,
+            "duration": 18157182750000
+          },
+          "speed": 1.0,
+          "is_muted": false
+        },
+        {
+          "id": "clip_sample_1hour_18157182750000",
+          "name": "tropical_paradise_1hour.mp4",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 18157182750000,
+            "duration": 79165551645000
+          },
+          "source_range": {
+            "start": 18157182750000,
+            "duration": 79165551645000
+          },
+          "speed": 1.0,
+          "is_muted": false
+        },
+        {
+          "id": "clip_sample_1hour_18157182750000_97322734395000",
+          "name": "tropical_paradise_1hour.mp4",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 97322734395000,
+            "duration": 817146293530824
+          },
+          "source_range": {
+            "start": 97322734395000,
+            "duration": 817146293530824
+          },
+          "speed": 1.0,
+          "is_muted": false
+        }
+      ]
+    },
+    {
+      "id": "A1",
+      "name": "Dialogue / Audio 1",
+      "kind": "Audio",
+      "is_locked": false,
+      "is_hidden": false,
+      "clips": [
+        {
+          "id": "audio_sample_1hour",
+          "name": "tropical_paradise_1hour.mp4 (Audio)",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 0,
+            "duration": 18157182750000
+          },
+          "source_range": {
+            "start": 0,
+            "duration": 18157182750000
+          },
+          "speed": 1.0,
+          "is_muted": false
+        },
+        {
+          "id": "audio_sample_1hour_18157182750000",
+          "name": "tropical_paradise_1hour.mp4 (Audio)",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 18157182750000,
+            "duration": 79165551645000
+          },
+          "source_range": {
+            "start": 18157182750000,
+            "duration": 79165551645000
+          },
+          "speed": 1.0,
+          "is_muted": false
+        },
+        {
+          "id": "audio_sample_1hour_18157182750000_97322734395000",
+          "name": "tropical_paradise_1hour.mp4 (Audio)",
+          "media_path": "assets/samples/tropical_paradise_1hour.mp4",
+          "timeline_range": {
+            "start": 97322734395000,
+            "duration": 817146293530824
+          },
+          "source_range": {
+            "start": 97322734395000,
+            "duration": 817146293530824
+          },
+          "speed": 1.0,
+          "is_muted": false
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "name": "Music / Sound FX",
+      "kind": "Audio",
+      "is_locked": false,
+      "is_hidden": false,
+      "clips": []
+    }
+  ],
+  "mark_in": null,
+  "mark_out": null
+}

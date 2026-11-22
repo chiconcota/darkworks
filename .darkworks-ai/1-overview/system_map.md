@@ -1,6 +1,6 @@
 # BẢN ĐỒ KIẾN TRÚC TOÀN HỆ THỐNG: DARKWORKS (system_map.md)
 @project: DARKWORKS | @type: GPU-Accelerated Node-Driven Video Editor (NLE)
-@engine: 100% Pure Rust + wgpu + egui | @base: FilmCraft Architecture | @status: 🟡 Setup & Architectural Blueprint
+@engine: 100% Pure Rust + wgpu + egui | @base: FilmCraft Architecture | @status: 🟢 Hoàn thành Giai Đoạn 2 (Lightworks UX & Rebranding) | 🟡 Sẵn sàng Giai Đoạn 3 (Node Graph DAG)
 
 > **Darkworks** là một trình dựng phim phi tuyến tính (Non-Linear Editor - NLE) thế hệ mới viết hoàn toàn bằng Rust, khắc phục triệt để các điểm yếu cố hữu của Blender VSE (ngốn RAM, khó làm Motion Graphics, thiếu tự động hóa).  
 > Phần mềm hoạt động theo triết lý **AI-First, Code-Driven, GPU Native Zero-Copy**, kết hợp mạng lưới **Node Graph (DAG)** và **Canvas 2D Node** vẽ trực tiếp trên GPU.
@@ -91,8 +91,8 @@ darkworks/
 | **Schema & Project State** | 🟢 Hoàn Thành | `crates/schema`: Tick nguyên thủy, TimeRange, ClipSlice, project.json. | Mở rộng schema cho Preset JSON. |
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
-| **Timeline NLE Core** | 🔴 Chưa Làm | Trục thời gian egui, cắt (Split), xóa (Ripple Delete), quản lý `project.json`. | Định nghĩa `ClipSlice` và Hot-Reload watcher. |
-| **Node Graph Engine (DAG)** | 🔴 Chưa Làm | Bảng nối dây `egui_snarl`, truyền `wgpu::Texture`, biên dịch shader. | Tạo 6 node nguyên tử đầu tiên (Transform, Blend, Color...). |
+| **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
+| **Node Graph Engine (DAG)** | 🟡 Sẵn Sàng (Phase 3) | Bảng nối dây `egui_snarl`, truyền `wgpu::Texture`, biên dịch shader. | Tạo crate `crates/node-graph` và 6 node nguyên tử đầu tiên (Transform, Blend, Color...). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng) và Whisper local. | Tích hợp `ort` ONNX runtime. |
@@ -123,6 +123,41 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-22 (Chuẩn Hóa Thương Hiệu Darkworks, Tinh Chỉnh Header & App Icon Mới):**
+  - Gỡ bỏ hoàn toàn nút Discord trên thanh Header bar và các liên kết thừa của ArtCraft; giữ nhãn `Help` phẳng trên Menu Bar cho tài liệu sau này.
+  - Chuẩn hóa toàn bộ tên thương hiệu `FilmCraft` ➔ `Darkworks` trên mọi cửa sổ, hộp thoại khôi phục sau crash, lỗi panic, bộ lọc file (`*.fcproj`), menu native và tên dự án mẫu mặc định (`Darkworks – Demo Project`).
+  - Thiết kế và tích hợp bộ icon chính thức của Darkworks (Biểu tượng chòm sao Node Graph Play Triangle Neon Cyan/Purple) cho eframe window và Taskbar/Dock desktop Linux (`dev.darkworks.editor.desktop`).
+  - Hoàn tất toàn bộ các bài test, nghiệm thu `audit.py` 0 vi phạm trần dòng code, `drive_feature.py -f all` 100% PASS, sẵn sàng bước sang Giai đoạn 3 (Đồ thị DAG Node Graph & 93 Atomic Shaders).
+
+- **2026-11-21 (Hoàn Thành Cấy Ghép Timeline Lightworks UX & Chuẩn Hóa Kiểm Thử 2 Tầng):**
+  - Cấy ghép hoàn chỉnh bộ phím tắt Lightworks (`I`, `O`, `P`, `X`, `Z`, `S`, `C`, `Shift+S`) làm preset mặc định `Darkworks Default`.
+  - Thiết kế dải sáng Cyan Highlight (`rgba(0, 210, 255, 35)`) bán trong suốt phủ toàn bộ các track trên Timeline cùng 2 mốc ngoặc `[` và `]` trên thước đo Ruler.
+  - Chuẩn hóa mô hình kiểm thử 2 tầng: `/e2e_test` (Technical Gate qua `run_e2e_audit.py`) và `/verify-feature` (Feature Acceptance Gate qua `drive_feature.py`).
+  - Dọn dẹp triệt để các thư mục rác ngoài chuẩn (`.cursor/`, `.agents/skills/verify-darkworks`), di dời toàn bộ hồ sơ tính năng vào `.darkworks-ai/1-overview/features/`.
+  - Nghiệm thu 100% PASS trên cả 3 tính năng FC-01, FC-02, DW-03 và toàn bộ 121 unit/integration tests (`filmcraft-engine`, `filmcraft-edit`).
+  - Đóng hoàn toàn Giai Đoạn 2, sẵn sàng bước sang Giai Đoạn 3 (Đồ thị DAG Node Graph & 93 WGSL Shaders).
+
+- **2026-11-21 (Tái Thiết Lập Workspace FilmCraft Foundation & Xóa Sạch Module Updater):**
+  - Khắc phục triệt để lỗi lệch hướng: Chuyển toàn bộ 33 crates nền tảng của FilmCraft vào `crates/` gốc, biến `apps/filmcraft` thành `apps/darkworks` và `apps/filmcraft-cli` thành `apps/darkworks-cli`.
+  - Kiểm toán và biên dịch 100% thành công: `darkworks --version` trả về `0.1.0`, render frame 1080p bằng `darkworks-cli render` trong 32.5 ms.
+  - Cắt bỏ hoàn toàn module updater `craft-update`, `updates_ui` và menu check update để tách rời Darkworks độc lập khỏi server FilmCraft.
+  - Khởi tạo Feature Map so sánh nền tảng FilmCraft và đột phá Darkworks tại `feature_map.md` và skill `verify-darkworks`.
+
+- **2026-11-20 (Chiến Lược Hướng 1, Nghiệm Thu 100% Phase 1 + 2, Undo/Redo & Menu Chuột Phải, Nâng Cấp `audit.py`):**
+  - Thống nhất chiến lược Hướng 1: Nền tảng FilmCraft + Timeline Lightworks + Đồ thị DAG Node Graph (`egui_snarl`).
+  - Triển khai `HistoryManager` (`crates/ui/src/history.rs`) lưu snapshot `Project` trong RAM, kích hoạt `Ctrl + Z` (Undo) và `Ctrl + Y` / `Ctrl + Shift + Z` (Redo), phân định rõ với phím `Z` đơn lẻ (Lift).
+  - Bổ sung phím `Delete` / `Backspace` xóa clip và Menu Chuột Phải (`timeline_menu.rs`) cho Clip (Split, Ripple Delete, Lift, Delete, Mute, Set In/Out).
+  - Nâng cấp công cụ kiểm toán trung tâm `audit.py` hỗ trợ cơ chế Vendor Allowlist. Tách `timeline_menu.rs` (100 dòng) giúp toàn bộ 32/32 file mã nguồn Darkworks đạt chuẩn xanh `< 650 dòng`.
+  - Chạy master E2E harness `run_e2e_audit.py` vượt qua 100% 7/7 cổng kiểm soát, biên dịch release binary thành công tại `target/release/darkworks`. Sẵn sàng cho Giai đoạn 3 (Node Graph).
+
+- **2026-11-20 (Nghiệm Thu Toàn Diện Giai Đoạn 2: Timeline NLE Core & Cắt Ghép Clips):**
+  - Hoàn thành 100% 6 tasks và đạt toàn bộ 7 tiêu chuẩn nghiệm thu DoD 2 trong [phase-2-timeline-nle.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/phase-2-timeline-nle.md).
+  - Tích hợp thành công cơ chế Mark In / Mark Out chuẩn Lightworks (phím `I`, `O`, `P`, `X`, `Z`, dải sáng Highlight phủ khắp tracks, kéo 2 mốc `[` / `]`).
+  - Triển khai Bộ điều phối Multi-Track Playhead Evaluator (`evaluator.rs`), liên kết Viewport và audio với các clip cắt ghép trên timeline (hiển thị frame đen tại khoảng trống Gap).
+  - Trực quan hóa sóng âm thanh (Audio Waveform) màu xanh lục bên trong các clip trên Track Audio A1/A2.
+  - Cơ chế File Watcher Hot-Reload `project.json` tự động cập nhật thời gian thực khi file JSON bị chỉnh sửa từ bên ngoài.
+  - Vượt qua 100% các cổng kiểm toán E2E, clippy 0 warning, toàn bộ 30 file mã nguồn đều đạt chuẩn `< 700 dòng code`. Bản build release sẵn sàng tại `target/release/darkworks`.
 
 - **2026-11-19 (Phân Tầng Cache 2 Cấp & Thuật Toán Dọn Dẹp O(1) Triệt Tiêu Lỗi Tụt 10 FPS):**
   - Chốt phân tầng bộ nhớ 2 cấp độ: Mức 1 là 1GB (1024MB) cho Video Frame Cache; Mức trần cứng là 2GB (2048MB) cho toàn bộ ứng dụng Darkworks.

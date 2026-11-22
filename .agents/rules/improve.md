@@ -47,3 +47,9 @@ trigger: always_on
   - *Bài học:* Darkworks là ứng dụng phần mềm máy tính (Desktop NLE Video Editor) bằng Rust, không phải dự án làm web dịch vụ. Lược bỏ hoàn toàn các tư duy Agency (Account, Client Brief, Nghiệm thu web).
 - **[2026-11-19] Bẫy xóa sạch Effect của FilmCraft:**
   - *Bài học:* Không xóa thẳng tay các file shader và struct của FilmCraft làm gãy compiler. Áp dụng chiến lược "Bọc ngoài & Thay ruột" để tái sử dụng toàn bộ 93 Shader WGSL có sẵn của họ thành các Node nguyên tử trong hệ thống Node Graph của Darkworks.
+- **[2026-11-20] Bẫy tự chế tạo lại bánh xe (Reinventing the Wheel) thay vì tận dụng nền tảng FilmCraft:**
+  - *Bài học:* Darkworks là bản nâng cấp NLE dựa trên nền tảng FilmCraft (thay Linear Effect Stack bằng Node Graph và cấy ghép Timeline Lightworks). Tuyệt đối không sa đà vào việc tự viết lại toàn bộ Player, Hardware decode hay Audio sync từ con số 0. Kế thừa triệt để các crate nền tảng vững chắc của FilmCraft để dồn toàn lực vào giá trị cốt lõi: **Đồ thị DAG Node Graph (`egui_snarl`)**.
+- **[2026-11-20] Bẫy ép chuẩn trần < 700 dòng lên mã nguồn Upstream / Vendor:**
+  - *Bài học:* Mã nguồn nền tảng upstream thường chứa những file lớn (> 700 dòng) đã được kiểm thử ổn định. Việc đập nhỏ file gốc của họ là phản tác dụng, gây lỗi ngầm và mất khả năng merge upstream. Cần cơ chế ngoại lệ rõ ràng (`audit.py` Vendor Allowlist) để chỉ siết trần 700 dòng đối với mã nguồn do Darkworks phát triển mới.
+- **[2026-11-22] Nhận diện thương hiệu & Đồng bộ Icon Hệ thống Desktop:**
+  - *Bài học:* Khi kế thừa nền tảng từ dự án upstream, ngoài việc đổi tên chuỗi code, cần rà soát đồng bộ các file từ điển dịch thuật (`i18n/*.tsv`), hộp thoại hệ thống native (`rfd`), tên project demo mặc định, và trọn bộ icon app (`app_icon()` nạp `.png` chuẩn, `dev_icon.rs` và `~/.local/share/icons/hicolor/`) để thanh Taskbar/Dock OS hiển thị đúng nhận diện thương hiệu Darkworks.

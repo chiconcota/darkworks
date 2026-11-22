@@ -1,6 +1,6 @@
 # SỔ BÀN GIAO TIẾN ĐỘ CA KÍP: DARKWORKS (checkpoint.md)
-@project: DARKWORKS | @phòng_ban: Toàn xưởng | @status: Hoàn thành 100% Giai đoạn 1 & Sẵn sàng Giai đoạn 2 (Timeline NLE Core)
-@session_end: 2026-11-19 | @next_session_focus: Giai đoạn 2 - Timeline NLE Core & Cắt ghép Clips
+@project: DARKWORKS | @phòng_ban: Toàn xưởng | @status: 🟢 Hoàn thành 100% Giai Đoạn 2 (Timeline Lightworks UX, Rebranding & Tinh Chỉnh Giao Diện)
+@session_end: 2026-11-22 | @next_session_focus: Giai đoạn 3 - Đồ thị DAG Node Graph (egui_snarl) & 93 Atomic Shaders
 
 > Sổ ghi chép bàn giao công việc giữa các phiên làm việc của AI.  
 > Khi mở phiên mới (/start_session), nhân viên đọc file này để nắm tiến độ dở dang trong 3 giây.
@@ -8,45 +8,40 @@
 ---
 
 ## 1. THÔNG TIN MÔI TRƯỜNG & TRẠNG THÁI HIỆN TẠI
-- **Môi trường:** Linux x86_64, Rust toolchain, Git, Vulkan / VA-API.
-- **Tình trạng:** Đã hoàn thành 100% Giai đoạn 1 (Media Player Engine & Viewport 60 FPS).
-- **Video Test Nghiệm Thu:** `assets/samples/tropical_paradise_1hour.mp4` (Video 1 tiếng thực tế, 254.7MB, 108.001 frames).
-- **Mã nguồn tham khảo:** Đã clone kho nguyên bản FilmCraft tại [reference/filmcraft](file:///mnt/Data/darkworks/reference/filmcraft) và cách ly an toàn trong [.gitignore](file:///mnt/Data/darkworks/.gitignore).
+- **Môi trường:** Linux x86_64, Rust 1.85 (Edition 2024), Vulkan / Linux VA-API (`/dev/dri/renderD128`).
+- **Tình trạng:** **ĐÃ HOÀN TẤT TOÀN DIỆN GIAI ĐOẠN 2 & HOÀN THIỆN NHẬN DIỆN THƯƠNG HIỆU DARKWORKS**:
+  - Loại bỏ hoàn toàn nút [Discord] trên thanh Header bar và các liên kết bên ngoài của FilmCraft/ArtCraft.
+  - Tinh gọn Menu Bar: Giữ lại nhãn `Help` phẳng trên menu bar cho tài liệu tương lai, lược bỏ toàn bộ submenu thừa.
+  - Chuẩn hóa toàn bộ chuỗi hiển thị thương hiệu: Đổi triệt để `FilmCraft` ➔ `Darkworks` trên mọi cửa sổ, hộp thoại khôi phục crash, lỗi panic, bộ lọc file (`*.fcproj`), menu native và tên dự án mẫu mặc định (`Darkworks – Demo Project`).
+  - Thiết kế và tích hợp trọn bộ icon app chính thức của Darkworks (Biểu tượng chòm sao Node Graph Play Triangle Neon Cyan/Purple) cho cả eframe window và Taskbar/Dock desktop Linux (`dev.darkworks.editor.desktop`).
+  - Kiểm toán `audit.py` 0 vi phạm trần dòng code (< 700 dòng).
+  - Bộ test tự động `drive_feature.py -f all` đạt **100% PASS** cho cả 3 tính năng (FC-01, FC-02, DW-03).
+  - `cargo check --workspace --all-targets` đạt **100% PASS**.
+- **Nhánh Git:** `main`.
 
 ---
 
-## 2. DANH SÁCH FILE ĐÃ THIẾT LẬP / CẬP NHẬT TRONG PHIÊN
-- **Kiến trúc & Lõi Media (`crates/media`):**
-  - [ffmpeg_source.rs](file:///mnt/Data/darkworks/crates/media/src/ffmpeg_source.rs): Triển khai `FfmpegMediaSource` với Background Prefetch Worker Thread qua streaming pipe FFmpeg độc lập, giải mã trước ~45 frames vào `FrameCache` (2GB cap).
-  - [source.rs](file:///mnt/Data/darkworks/crates/media/src/source.rs): Bổ sung `notify_playhead` và `seek` vào `MediaSource` trait.
-  - [cache.rs](file:///mnt/Data/darkworks/crates/media/src/cache.rs): Quản lý FrameCache LRU phân tầng 2 cấp (Mức 1: 1024MB, Mức trần: 2048MB), dọn dẹp vi mô $O(1)$ không giữ khóa Mutex.
-  - [audio_player.rs](file:///mnt/Data/darkworks/crates/media/src/audio_player.rs): Đồng bộ âm thanh A/V Master Clock qua `cpal` và Monotonic Audio Feed Head.
-- **Giao diện Người Dùng (`crates/ui`):**
-  - [app.rs](file:///mnt/Data/darkworks/crates/ui/src/app.rs): Nạp FrameCache dùng chung, kết nối `active_source.notify_playhead(playhead)` và xử lý nạp asset khi click vào Bin.
-  - [menu_bar.rs](file:///mnt/Data/darkworks/crates/ui/src/panels/menu_bar.rs): Hiển thị `RAM: XMB / YMB (2GB Cap)` với chỉ báo màu sắc thời gian thực.
-  - [source_bin.rs](file:///mnt/Data/darkworks/crates/ui/src/panels/source_bin.rs): Hỗ trợ click vào Clip danh sách để switch `active_source`.
-- **Tài liệu & Bộ nhớ:**
-  - [phase-1-media-player.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/phase-1-media-player.md): Đạt 100% DoD.
-  - [system_map.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/system_map.md): Cập nhật trạng thái module và nhật ký thay đổi.
-  - [decision-log.md](file:///mnt/Data/darkworks/.darkworks-ai/2-memory/decision-log.md): Bổ sung Quyết định #13, #14 và #15 về giải mã video 1 tiếng, luồng prefetch ngầm 60 FPS, và phân tầng cache 2 cấp (1GB/2GB).
-  - [architecture.md](file:///mnt/Data/darkworks/.darkworks-ai/3-modules/media/architecture.md): Cập nhật kiến trúc FrameCache $O(1)$ và FfmpegMediaSource.
+## 2. DANH SÁCH FILE THAY ĐỔI TRONG PHIÊN
+- [crates/ui-egui/src/header.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/header.rs): Gỡ nút Discord, mở rộng không gian cho tiêu đề project.
+- [crates/ui-egui/src/menus.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/menus.rs): Giữ nhãn `Help` phẳng không mở submenu; xóa menu path các lệnh help cũ.
+- [crates/ui-egui/src/panels/file_dialogs.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/file_dialogs.rs): Chuẩn hóa câu thông báo khôi phục crash `Darkworks quit unexpectedly...`.
+- [crates/ui-egui/src/app/frame.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/app/frame.rs): Cửa sổ báo lỗi UI `Darkworks hit an error`.
+- [crates/ui-egui/src/panels/dialogs.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/dialogs.rs): Hộp thoại About Darkworks.
+- [crates/engine/src/demo.rs](file:///mnt/Data/darkworks/crates/engine/src/demo.rs): Dự án mẫu mặc định mang tên `Darkworks – Demo Project`.
+- [crates/project/src/settings.rs](file:///mnt/Data/darkworks/crates/project/src/settings.rs) & [crates/engine/src/project_tools.rs](file:///mnt/Data/darkworks/crates/engine/src/project_tools.rs): Renderer mặc định `Darkworks GPU Acceleration (wgpu)`.
+- [apps/darkworks/src/main.rs](file:///mnt/Data/darkworks/apps/darkworks/src/main.rs): Cửa sổ eframe mang tên `Darkworks`, nạp icon `darkworks-256.png`.
+- [apps/darkworks/src/dev_icon.rs](file:///mnt/Data/darkworks/apps/darkworks/src/dev_icon.rs): Đăng ký launcher desktop `dev.darkworks.editor.desktop`.
+- [assets/app-icon/](file:///mnt/Data/darkworks/assets/app-icon/): Tạo trọn bộ icon ứng dụng Darkworks (16px đến 1024px).
+- [.darkworks-ai/2-memory/decision-log.md](file:///mnt/Data/darkworks/.darkworks-ai/2-memory/decision-log.md): Bổ sung Quyết định #23, #24, #25.
 
 ---
 
-## 3. CÁC VẤN ĐỀ ĐÃ GIẢI QUYẾT & BÀI HỌC KINH NGHIỆM (RESOLVED)
-1. **Khắc phục lỗi tụt FPS từ 5 - 11 FPS về 60 FPS mượt mà:** Chuyển việc giải mã sang `run_prefetch_loop` ngầm đọc streaming pipe tốc độ cao (~53x real-time), UI thread chỉ đọc frame từ RAM (<0.001ms).
-2. **Khắc phục lỗi tụt 10 FPS khi chạm trần RAM:**
-   - *Nguyên nhân:* Xả lũ hàng loạt 300MB và sắp xếp 2.000+ key trong khi giữ khóa `Mutex`.
-   - *Khắc phục:* Chuyển sang thuật toán dọn dẹp vi mô $O(1)$ qua `VecDeque` và giải phóng vùng nhớ byte hoàn toàn NGOÀI khóa `Mutex`.
-3. **Phân tầng ngân sách 2 cấp độ rõ ràng:** Mức 1 là 1GB (1024MB) cho video cache; Mức trần cứng là 2GB (2048MB) cho toàn bộ ứng dụng Darkworks (đủ chỗ cho AI Worker Whisper/VAD và Audio).
-4. **Tuân thủ quy chuẩn:** Toàn bộ 23 file mã nguồn Rust đều đạt chuẩn an toàn < 700 dòng code, không unwrap/panic, 0 clippy warnings, vượt qua toàn bộ 7 cổng kiểm toán của [run_e2e_audit.py](file:///mnt/Data/darkworks/.agents/harness/run_e2e_audit.py).
-
----
-
-## 4. KẾ HOẠCH BÀN GIAO CA TIẾP THEO (NEXT ACTIONS CHECKLIST)
-- [x] **Giai đoạn 1 (Media Player):** Hoàn tất 100%.
-- [ ] **Giai đoạn 2 (Timeline NLE Core):**
-  - [ ] Bổ sung cấu trúc dữ liệu đa track (Multi-track Video/Audio tracks) trong `crates/schema`.
-  - [ ] Thao tác cắt Clip (Razor / Split) theo phím tắt `C` hoặc icon kéo.
-  - [ ] Thao tác kéo trượt Clip trên Timeline, xóa dồn (Ripple Delete) bằng phím `Delete` / `Backspace`.
-  - [ ] Cơ chế File Watcher hot-reload `project.json`.
+## 3. KẾ HOẠCH HÀNH ĐỘNG CA TIẾP THEO (PHASE 3: ĐỒ THỊ DAG NODE GRAPH)
+- [x] **Giai đoạn 1:** Tiếp nhận nền tảng FilmCraft, khóa trần RAM < 2GB (Hoàn thành 100%).
+- [x] **Giai đoạn 2:** Cấy ghép Timeline Lightworks UX & Tinh chỉnh thương hiệu Darkworks (Hoàn thành 100%).
+- [ ] **Giai đoạn 3 (Đồ thị DAG Node Graph & 93 WGSL Shaders - Trọng tâm cốt lõi):**
+  - [ ] Khởi tạo crate `crates/node-graph` tích hợp `egui_snarl`.
+  - [ ] Khai tử danh sách tuyến tính `Vec<EffectInstance>` cũ của FilmCraft/Premiere.
+  - [ ] Xây dựng giao diện Node Graph Canvas tương tác mượt mà (kéo thả node, socket in/out, dây cong Bézier).
+  - [ ] Đóng gói 93 Shader WGSL từ `crates/render` thành các Node nguyên tử (Transform, Blend, Color Grading, Keying, Blur, v.v.).
+  - [ ] Hỗ trợ xuất/nạp đồ thị độc lập định dạng `.preset.json`.

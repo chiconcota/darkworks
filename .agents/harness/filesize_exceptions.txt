@@ -1,0 +1,48 @@
+# DANH SÁCH NGOẠI LỆ KIỂM TOÁN FILE SIZE (filesize_exceptions.txt)
+# ==============================================================
+# Quy định:
+# 1. Các file/thư mục mã nguồn thuộc lớp nền kế thừa từ FilmCraft (Upstream / Vendor Base)
+#    được phép vượt trần 700 dòng để bảo toàn tính toàn vẹn và ổn định của thư viện.
+# 2. File do Darkworks phát triển mới (crates/node-graph, crates/canvas-renderer, crates/ai-workers)
+#    bắt buộc tuân thủ trần < 700 dòng và chỉ được thêm vào danh sách này khi có
+#    sự PHÊ DUYỆT TRỰC TIẾP TỪ NGƯỜI DÙNG (Giám Đốc).
+#
+# Cú pháp: mỗi dòng một đường dẫn tương đối (hoặc tiền tố thư mục) tính từ thư mục gốc.
+
+# Lớp nền FilmCraft Upstream Crates:
+crates/audio-dsp/
+crates/automation/
+crates/bitstream/
+crates/captions/
+crates/cfb/
+crates/codecs/
+crates/color/
+crates/dng/
+crates/edit/
+crates/engine/
+crates/export/
+crates/format/
+crates/frame/
+crates/geom/
+crates/golden/
+crates/gpu/
+crates/interchange/
+crates/isobmff/
+crates/matroska/
+crates/media/
+crates/platform/
+crates/project/
+crates/render/
+crates/scopes/
+crates/speech/
+crates/testkit/
+crates/text/
+crates/time/
+crates/tts/
+crates/tts-text/
+crates/ui-egui/
+
+# Lớp nền FilmCraft Base Apps:
+apps/darkworks/
+apps/darkworks-cli/
+apps/filmcraft-web/

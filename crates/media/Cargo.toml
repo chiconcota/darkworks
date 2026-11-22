@@ -1,26 +1,33 @@
 [package]
-name = "darkworks-media"
+name = "filmcraft-media"
+description = "Media sources: probing, decoding traits, frame cache, generators, stills"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-authors.workspace = true
-repository.workspace = true
-description = "GPU-accelerated media engine, hardware VA-API video decoding, byte-budgeted LRU cache, and A/V sync for Darkworks"
-
-[dependencies]
-darkworks-schema = { workspace = true }
-thiserror = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-log = { workspace = true }
-cpal = { workspace = true }
-symphonia = { workspace = true }
-libloading = { workspace = true }
-rayon = { workspace = true }
-image = { workspace = true }
-parking_lot = { workspace = true }
-crossbeam-channel = { workspace = true }
 
 [lints]
 workspace = true
+
+[dependencies]
+craft-hdr = { workspace = true }
+craft-psd = { workspace = true }
+craft-tiff-ycbcr = { workspace = true }
+craft-tga = { workspace = true }
+filmcraft-time = { workspace = true }
+filmcraft-color = { workspace = true }
+filmcraft-frame = { workspace = true }
+craft-audio = { workspace = true, features = ["pcm-encode"] }
+craft-media = { workspace = true }
+filmcraft-dng = { workspace = true }
+craft-dpx = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "tiff", "bmp"] }
+
+[dev-dependencies]
+filmcraft-testkit = { workspace = true }
+filmcraft-dng = { workspace = true, features = ["writer"] }
+# APNG fixtures for the animated-image tests (the image crate does not encode APNG)
+png = "0.18"

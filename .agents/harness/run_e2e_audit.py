@@ -122,7 +122,7 @@ def main():
     # 5. File Size Audit (< 700 lines)
     ok, _ = run_step(
         "Bước 4: Kiểm toán Kích thước File (< 700 dòng code)",
-        [sys.executable, ".agents/harness/check_file_size.py"],
+        [sys.executable, ".agents/harness/audit.py"],
         cwd=root_dir,
     )
     results.append(("File Size Limit Audit (< 700 lines)", ok))

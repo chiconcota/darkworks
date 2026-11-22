@@ -1,16 +1,37 @@
 # MODULE KIẾN TRÚC: USER INTERFACE (ui/architecture.md)
-@crate: `crates/ui` (hoặc `ui-egui`) | @layer: L6 / Presentation & Interaction
+@crate: `crates/ui-egui` (ứng dụng chính `apps/darkworks`) | @layer: L6 / Presentation & Interaction | @status: 🟢 Hoàn thành Giai Đoạn 2 (Timeline Lightworks UX)
 
 ## 1. VAI TRÒ & TRÁCH NHIỆM
-Chịu trách nhiệm hiển thị giao diện đồ họa 60fps siêu mượt bằng `egui`, chia làm 4 phân vùng làm việc chuẩn của một NLE chuyên nghiệp.
+Chịu trách nhiệm hiển thị toàn bộ giao diện 60fps siêu mượt bằng `egui` + `wgpu`, hỗ trợ Dockable Panels, Dual Monitor (Source Monitor + Program Monitor), Audio Mixer đa kênh, và Trục thời gian Timeline chuẩn phong cách biên tập **Lightworks Mark & Park**.
 
-## 2. 4 PHÂN VÙNG GIAO DIỆN
-1. **Source / Project Bin (Góc trên bên trái):** Quản lý tài nguyên media (video gốc, âm thanh, ảnh, preset).
-2. **Viewport (Góc trên ở giữa/phải):** Khung xem trước (Preview) render trực tiếp từ GPU `wgpu::Texture`.
-3. **Inspector / Node Graph Panel (Bên phải):**
-   - Chế độ cơ bản: Bảng trượt thông số đơn giản (Inspector) dựa trên các `exposed_inputs` của Preset.
-   - Chế độ nâng cao: Nút bấm [Open Node Graph] mở cửa sổ mạng lưới `egui_snarl` để nối dây chi tiết.
-4. **Timeline (Nửa dưới màn hình):**
-   - Hiển thị các Track Video, Audio, Canvas.
-   - Thao tác chuột mượt mà: Scrubbing (tua nhanh), Split (phím S), Ripple Delete (phím X), kéo dãn biên clip.
-   - Thanh công cụ nhanh: ⚡ Auto Cut Silence, 💬 Auto Subtitle.
+## 2. CẤU TRÚC PHÂN VÙNG GIAO DIỆN
+1. **Source Monitor & Program Monitor ([panels/monitor.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/monitor.rs)):**
+   - Source Viewer: Xem và cắt in/out clip thô trong Media Bin.
+   - Program Viewer: Khung xem trước render Zero-Copy từ GPU `wgpu::Texture`, bám sát theo Playhead của Sequence.
+2. **Media Bin / Project Browser ([panels/project.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/project.rs)):**
+   - Quản lý bins, media files (video, audio, hình ảnh), hỗ trợ kéo thả trực tiếp vào Timeline hoặc Source Monitor.
+3. **Timeline Lightworks NLE ([panels/timeline/](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/timeline/)):**
+   - Trục thời gian đa track (V1, V2 Video; A1, A2 Audio, Caption tracks).
+   - Cơ chế Mark & Park chuẩn Lightworks:
+     - `I` ➔ Mark In (`markers.markIn`)
+     - `O` ➔ Mark Out (`markers.markOut`)
+     - `P` ➔ Clear In/Out (`markers.clearInOut`)
+     - `X` ➔ Extract (`sequence.extract` - Ripple Delete vùng chọn In/Out)
+     - `Z` ➔ Lift (`sequence.lift` - Xóa rỗng vùng chọn để lại khoảng trống Gap)
+     - `S` hoặc `C` ➔ Razor Split (`sequence.addEdit` - Cắt clip tại Playhead)
+     - `Shift + S` ➔ Bật/tắt hít mép timeline (`sequence.snap`)
+   - **Trực quan hóa dải Cyan Highlight ([ruler.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/timeline/ruler.rs) & [timeline.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/timeline.rs)):**
+     - Dải phủ màu Cyan bán trong suốt `rgba(0, 210, 255, 35)` phủ xuyên suốt toàn bộ chiều dọc tất cả các Track.
+     - Hai đường laser viền Cyan ở hai đầu mốc In và Out.
+     - Hai mốc ngoặc vuông `[` (In) và `]` (Out) màu Cyan nổi bật trên thanh Ruler.
+4. **Audio Track Mixer ([panels/mixer.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/mixer.rs)):**
+   - Bộ trộn âm thanh đa kênh, faders, VU meters theo chuẩn LUFS / dBTP.
+
+## 3. CÁC HỆ THỐNG PHỤ TRỢ CỐT LÕI
+- **Lịch sử Undo / Redo Toàn Cục:**
+  - Cơ chế `Arc<Project>` Copy-on-Write từ `crates/engine`: mọi thao tác qua `Session::execute` đều tự động lưu snapshot, bấm `Ctrl + Z` (Undo) và `Ctrl + Y` (Redo) tức thì mà không tốn RAM.
+- **Tách Biệt Độc Lập Khỏi FilmCraft Server:**
+  - Đã loại bỏ hoàn toàn crate `craft-update`, `updates_ui` và các cờ check update để ứng dụng Darkworks chạy độc lập 100%.
+  - Loại bỏ nút Discord trên thanh Header và toàn bộ submenu thừa của Help (giữ lại nhãn `Help` để gắn tài liệu sau).
+- **Kiểm Thử Nghiệp Vụ:**
+  - Hỗ trợ lái và kiểm thử trực tiếp qua skill `/verify-feature` và công cụ `.agents/harness/drive_feature.py`.
