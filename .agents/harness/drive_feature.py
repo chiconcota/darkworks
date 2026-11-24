@@ -134,6 +134,31 @@ def verify_lightworks_editing():
     return True
 
 
+def verify_node_graph():
+    print("\n▶️  [DW-01] Kiểm chứng: DAG Node Graph Engine, 18 Atomic Nodes & 5 Presets")
+    node_panel_file = WORKSPACE / "crates" / "ui-egui" / "src" / "panels" / "node_graph.rs"
+    if not node_panel_file.exists():
+        print("  ❌ Không tìm thấy file node_graph.rs trong ui-egui!")
+        return False
+
+    t0 = time.perf_counter()
+    res = subprocess.run(
+        ["cargo", "test", "-p", "darkworks-node-graph", "--", "test_all_5_builtin_presets_validation", "test_18_atomic_nodes_creation_and_sockets", "test_dag_evaluator_cycle_detection"],
+        cwd=WORKSPACE,
+        capture_output=True,
+        text=True,
+    )
+    dt_ms = (time.perf_counter() - t0) * 1000
+
+    if res.returncode != 0:
+        print(f"  ❌ Lỗi khi chạy test suite darkworks-node-graph:\n{res.stderr.strip()}")
+        return False
+
+    print(f"  ✅ 18 Atomic Nodes, 5 Presets & DAG Cycle Detection kiểm thử thành công ({dt_ms:.1f}ms)!")
+    print(f"  🌟 Giao diện Node Graph Panel đã tích hợp sẵn sàng trong Docking Layout.")
+    return True
+
+
 def main():
     print_banner()
     parser = argparse.ArgumentParser(description="Darkworks Feature Verification Driver")
@@ -159,6 +184,9 @@ def main():
 
     if feat in ["all", "lightworks", "dw-03", "darkworks_lightworks_editing"]:
         results["DW-03 Lightworks Editing"] = verify_lightworks_editing()
+
+    if feat in ["all", "nodegraph", "node-graph", "node_graph", "dw-01", "darkworks_node_graph"]:
+        results["DW-01 Node Graph Engine"] = verify_node_graph()
 
     if not results:
         print(f"⚠️  Chưa có kịch bản kiểm thử tự động cho feature: '{args.feature}'.")

@@ -32,6 +32,9 @@ pub mod monitor;
 pub mod monitor_view;
 pub mod motion_path;
 pub mod multicam;
+pub mod node_graph;
+pub mod node_graph_groups;
+pub mod node_graph_menus;
 pub mod notes;
 pub mod panel_state;
 pub mod presets;
@@ -145,6 +148,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::Tools => tools::show(app, ui, rect),
         PanelKind::Effects => effects::show(app, ui, rect),
         PanelKind::EffectControls => effect_controls::show(app, ui, rect),
+        PanelKind::NodeGraph => node_graph::show(app, ui, rect),
         PanelKind::AudioMeters => meters::show(app, ui, rect),
         PanelKind::LumetriColor => lumetri::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),

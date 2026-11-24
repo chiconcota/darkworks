@@ -92,10 +92,10 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Sẵn Sàng (Phase 3) | Bảng nối dây `egui_snarl`, truyền `wgpu::Texture`, biên dịch shader. | Tạo crate `crates/node-graph` và 6 node nguyên tử đầu tiên (Transform, Blend, Color...). |
+| **Node Graph Engine (DAG)** | 🟢 Hoàn Thành (Phase 3) | Đồ thị DAG `egui_snarl`, Hệ sinh thái 18 Atomic Nodes bản đầy đủ (Full Production-Ready), DagEvaluator (Topological Sort + Cycle Proof), Kho 5 Built-in Presets, Visual Groups ComfyUI, JIT WGSL Reflection. | Sẵn sàng cho Giai Đoạn 4 (Canvas 2D Node Vello + Cosmic-text). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
-| **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng) và Whisper local. | Tích hợp `ort` ONNX runtime. |
+| **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
 
 *Ghi chú ký hiệu trạng thái:* 🔴 Chưa bắt đầu | 🟡 Đang triển khai | 🟢 Hoàn thành nghiệm thu
 
@@ -124,6 +124,39 @@ flowchart TD
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
 
+- **2026-11-24 (Hoàn Thiện 100% Bộ Công Cụ Visual Group UX: Inline Rename, Context Menu, Rã Nhóm `Ctrl+Shift+G`, Auto-Fit & Lock Mode):**
+  - Tích hợp Inline Rename: Nhấp đúp vào Header Bar hoặc bấm phím tắt `F2` để gõ đổi tên trực tiếp trên Canvas (Enter lưu, Esc hủy).
+  - Tích hợp Menu Chuột Phải đầy đủ trên Header Bar: Đổi tên, Bảng màu 6 màu ComfyUI, Auto-Fit, Khóa vị trí, Rã nhóm, Xóa cụm.
+  - Phím tắt `Ctrl + Shift + G`: Rã nhóm nhanh (hủy khung nhóm nhưng giữ nguyên toàn bộ Node và dây nối bên trong).
+  - Căn vừa tự động (Auto-Fit to Content): Nhấp đúp tay cầm resize hoặc chọn trong menu để khung Group tự động co/dãn ôm khít các Node con (+35px padding lề và chừa 40px không gian Header).
+  - Chế độ Khóa vị trí (Lock Mode): Thêm `is_locked: bool` vào `VisualGroup`, hiện icon 🔒 trên Header, vô hiệu hóa việc kéo di chuyển và resize.
+  - Tách phân hệ kiến trúc độc lập `crates/ui-egui/src/panels/node_graph_groups.rs` (354 dòng), giữ `node_graph.rs` (520 dòng) luôn đạt chuẩn an toàn `< 700 dòng`.
+  - Bộ 13/13 tests tích hợp pass 100%, clippy 0 warning, 0 error, sẵn sàng bước sang Giai đoạn 4.
+
+- **2026-11-23 (Visual Group Ergonomics, Gom Nhóm Nhanh `Ctrl + G`, Kéo Thả Đồng Bộ & Khắc Phục Lỗi Chồng Đè):**
+  - Khắc phục triệt để lỗi 2 group tạo mới sinh đè lên nhau tại cùng vị trí `(120, 120)` làm rối chữ `gro[p 2121`. Tự động áp dụng vị trí so le (+50px) và xoay vòng 6 màu sắc ComfyUI.
+  - Tích hợp phím tắt `Ctrl + G` (hoặc `Cmd + G`): Tự động tính Bounding Box bao quanh các Node đang chọn (+35px padding) và gom nhanh vào Visual Group với tên mặc định `Group {N}`.
+  - Thao tác kéo thả trực tiếp trên Canvas: Kéo Header Bar di chuyển đồng bộ cả Group VÀ toàn bộ Node bên trong; kéo Resize Grip góc dưới phải mở rộng/thu hẹp khung Group.
+  - Triệt tiêu hiện tượng trôi canvas khi kéo group bằng cách khóa `to_global.translation` trong `DarkworksViewer::current_transform`.
+  - Soạn thảo tài liệu đặc tả ma trận 20 tính năng UX/UI toàn diện cho Visual Group tại `visual_group_ux_specs.md`. Toàn bộ 11 tests pass, file mã nguồn đạt chuẩn an toàn < 700 dòng.
+
+- **2026-11-22 (Hoàn Thành 100% Giai Đoạn 3: Hệ Sinh Thái 18 Atomic Nodes & Kho 5 Built-in Presets Mẫu):**
+  - Mở rộng toàn diện `darkworks-node-graph` lên đầy đủ 18 Versatile Atomic Nodes: tích hợp thêm `BlurSharpen` (5 loại blur cũ), `DistortLens` (6 loại biến dạng cũ), `Transition` (30 loại chuyển cảnh cũ).
+  - Bổ sung các thông số chuyên nghiệp bản đầy đủ (không chia bản rút gọn): `Invert` và `B&W` trong `ColorGrade`; `Flip H`, `Flip V` và `Anchor` trong `Transform2D`; `Feather` trong `CropMask`; `Spill Suppress` trong `Keyer`.
+  - Xây dựng kho 5 Built-in Presets giải quyết trọn vẹn các bài toán thực tế: (1) `News Ticker Banner`, (2) `Continuous Audio Waveform Line (60 FPS)`, (3) `Spotlight Invert`, (4) `Audio Beat Invert Flash`, (5) `Cinematic Soft Glow`.
+  - Tích hợp Menu `➕ Add Node` 6 phân khu trực quan và Menu `📂 Load Preset` 1-click tức thì trên Toolbar của `PanelKind::NodeGraph`.
+  - Toàn bộ 11 tests tích hợp và 35 dock tests đạt **100% PASS**, kiểm toán `audit.py` đạt chuẩn tuyệt đối (10/10 files < 700 dòng), clippy sạch 0 cảnh báo.
+  - Đóng hoàn toàn Giai Đoạn 3 (Phase 3), sẵn sàng bước sang Giai Đoạn 4 (Canvas 2D Node Vello + Cosmic-text).
+
+- **2026-11-22 (Triển Khai Lõi Node Graph DAG & Hệ Sinh Thái Atomic / Black / Action / Code Nodes):**
+  - Khởi tạo thành công crate `darkworks-node-graph` (`crates/node-graph`) với 15 biến thể `DarkNode` (Generator, Filter/Compositing, Advanced, ComfyUI Ergonomics).
+  - Tích hợp thành công `egui-snarl` và `egui-scale` vào workspace `egui 0.37`, mở rộng docking panel `PanelKind::NodeGraph` trong `crates/ui-egui`.
+  - Triển khai bộ duyệt đồ thị `DagEvaluator` với thuật toán Topological Sort (Kahn's Algorithm), phát hiện vòng lặp vô tận (Cycle Detection) và tính toán luồng tín hiệu số (Signal Propagation) thời gian thực.
+  - Xây dựng phân hệ `BlackNodeSubgraph` (Compound Subgraph) hỗ trợ đóng gói cụm node, bộc lộ cổng Exposed Pins và xuất/nạp Preset `.preset.json`.
+  - Triển khai `WgslParser` (Code Node JIT Shader Reflection) tự động trích xuất các biến `@group(..) @binding(..) var<uniform>` thành các socket điều khiển.
+  - Tích hợp bộ công cụ ComfyUI Style: Visual Groups / Backdrop Box có thể đổi màu, kéo dính node con, Sticky Notes và Reroute Dots.
+  - Đạt 100% PASS bộ kiểm thử 8 unit tests và 35 dock tests, toàn bộ file mã nguồn tuân thủ trần chuẩn `< 700 dòng`.
+
 - **2026-11-22 (Chuẩn Hóa Thương Hiệu Darkworks, Tinh Chỉnh Header & App Icon Mới):**
   - Gỡ bỏ hoàn toàn nút Discord trên thanh Header bar và các liên kết thừa của ArtCraft; giữ nhãn `Help` phẳng trên Menu Bar cho tài liệu sau này.
   - Chuẩn hóa toàn bộ tên thương hiệu `FilmCraft` ➔ `Darkworks` trên mọi cửa sổ, hộp thoại khôi phục sau crash, lỗi panic, bộ lọc file (`*.fcproj`), menu native và tên dự án mẫu mặc định (`Darkworks – Demo Project`).
@@ -143,6 +176,17 @@ flowchart TD
   - Kiểm toán và biên dịch 100% thành công: `darkworks --version` trả về `0.1.0`, render frame 1080p bằng `darkworks-cli render` trong 32.5 ms.
   - Cắt bỏ hoàn toàn module updater `craft-update`, `updates_ui` và menu check update để tách rời Darkworks độc lập khỏi server FilmCraft.
   - Khởi tạo Feature Map so sánh nền tảng FilmCraft và đột phá Darkworks tại `feature_map.md` và skill `verify-darkworks`.
+
+- **2026-11-24 (Nghiệm Thu Toàn Diện Visual Group UX, Phím Xóa Delete/Backspace & Tính Năng Undo/Redo Node Graph):**
+  - Khắc phục triệt để lỗi không kéo tách được 2 nhóm ra xa nhau bằng cơ chế Strict Containment (`contains_group`), xóa bỏ hoàn toàn hiện tượng Mutual Lock dính chùm khi hai nhóm giao cắt.
+  - Nâng cấp tay cầm co giãn Resize Grip lên 32x32px với 3 đường rãnh chéo, diện tích bắt chuột rộng rãi gấp 2.5 lần, thao tác co giãn mượt mà.
+  - Khắc phục triệt để Lỗi 01: Group con nằm lồng trong Group cha không tương tác được do vùng chết ảo bounding box thô và thứ tự duyệt Z-order. Thu hẹp `over_node_header` ~26px, duyệt canvas đảo ngược `.rev()`, và tịnh tiến đồng bộ nhóm con khi kéo nhóm cha.
+  - Hoàn thiện trọn bộ Visual Group UX theo đặc tả `visual_group_ux_specs.md`: Inline Rename (`F2` / Double Click), Context Menu chuột phải đầy đủ, Phím tắt rã nhóm nhanh `Ctrl + Shift + G` giữ nguyên Node, Căn vừa tự động Auto-Fit ôm khít nội dung, Chế độ khóa vị trí Lock Mode bảo vệ sơ đồ.
+  - Kết nối phím tắt xóa dùng chung chuẩn FilmCraft (`Delete` / `Backspace`): Tự động bắt tiêu điểm `app.ui.focused = PanelKind::NodeGraph`, bắt chặn thông minh lệnh `edit.clear` xóa hàng loạt node quét chọn hoặc group đang trỏ chuột, thêm nút `🗑 Delete` trực quan trên thanh toolbar.
+  - Tích hợp ngăn xếp lịch sử Undo / Redo (`GraphHistory` & `GraphSnapshot`): Tự động chụp snapshot trước mọi thao tác sửa/xóa, hỗ trợ phím tắt `Ctrl + Z` và `Ctrl + Y` / `Ctrl + Shift + Z`, bổ sung 2 nút `↶ Undo` và `↷ Redo` trên thanh công cụ.
+  - Khắc phục triệt để lỗi Node bị mất snapshot khi xóa (`Ctrl + Delete` / `Delete`): Vô hiệu hóa xóa ngầm của `vendor/egui-snarl`, cố định `snarl_canvas_id` qua `SnarlWidget::new().id(...)`, tiêu thụ phím `consume_key` và làm sạch vùng chọn qua `deselect_all_nodes`.
+  - Tách module `node_graph_menus.rs` (247 dòng) và `node_graph_groups.rs` (394 dòng), duy trì `node_graph.rs` chỉ 593 dòng (< 700 dòng).
+  - Vượt qua 100% 16/16 unit tests, 4/4 feature acceptance verifications, 0 cảnh báo Clippy, 0 vi phạm trần dòng code.
 
 - **2026-11-20 (Chiến Lược Hướng 1, Nghiệm Thu 100% Phase 1 + 2, Undo/Redo & Menu Chuột Phải, Nâng Cấp `audit.py`):**
   - Thống nhất chiến lược Hướng 1: Nền tảng FilmCraft + Timeline Lightworks + Đồ thị DAG Node Graph (`egui_snarl`).

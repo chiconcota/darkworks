@@ -74,28 +74,43 @@ flowchart TD
 
 ---
 
-## ⚪ GIAI ĐOẠN 3: ĐỒ THỊ DAG NODE GRAPH & 93 WGSL SHADERS (PHASE 3) - TRỌNG TÂM CỐT LÕI
-**Trạng thái:** ⚪ **CHỜ TRIỂN KHAI**  
-**Mục tiêu:** **Cách mạng hóa hệ thống hiệu ứng** — Khai tử danh sách `effects: Vec<EffectInstance>` tuyến tính tuần tự của Premiere/FilmCraft gốc, thay thế bằng Đồ thị DAG Node Graph (`egui_snarl`), biến toàn bộ 93 Shader WGSL thành các Node nguyên tử (Atomic Nodes).
+## ⚪ GIAI ĐOẠN 3: ĐỒ THỊ DAG NODE GRAPH, BLACK NODE, ACTION NODE & CODE NODE (PHASE 3) - TRỌNG TÂM CỐT LÕI
+**Trạng thái:** 🟡 **SẴN SÀNG TRIỂN KHAI**  
+**Mục tiêu:** **Cách mạng hóa hệ thống hiệu ứng** — Khai tử danh sách `effects: Vec<EffectInstance>` tuyến tính tuần tự của Premiere/FilmCraft gốc, thay thế bằng Đồ thị DAG Node Graph (`egui_snarl`), hệ sinh thái 10+ Atomic Nodes, Black Node (Compound FX Layer), Action Node (Workflow Automation), ComfyUI Canvas Ergonomics, Code Node (Custom WGSL JIT) và 93 WGSL Shaders.
 
-- [ ] **Task 3.1 [Khởi Tạo Crate `crates/node-graph` & Snarl Canvas]:**
+- [ ] **Task 3.1 [Khởi Tạo Crate `crates/node-graph` & Snarl Canvas UI]:**
   - Tích hợp `egui_snarl` vào UI Darkworks, dựng panel Node Graph trực quan (kéo thả socket, dây cong Bézier, zoom/pan canvas vô cực).
-- [ ] **Task 3.2 [Xóa Bỏ Linear Effect Stack Khỏi Clip]:**
-  - Thay thế bảng Effect Controls cũ của Premiere bằng Node Graph Panel & Node Inspector hiện đại.
-- [ ] **Task 3.3 [Bộ 6 Atomic Nodes Nền Tảng]:**
-  - `Node Video Source`: Đầu vào hình ảnh lấy từ Clip trên Timeline tại thời điểm Playhead.
-  - `Node Transform`: Thay đổi vị trí X/Y, Scale, Rotation, Anchor point.
+  - Tích hợp công cụ ComfyUI Style: Visual Group/Backdrop, Sticky Note, Reroute Dot, Snap-to-Grid, Minimap.
+- [ ] **Task 3.2 [Schema Đồ Thị & Hệ Thống Sockets/Pins]:**
+  - Định nghĩa các kiểu Socket: Texture (Xanh lam), AudioFloat (Xanh lá), Scalar/Vector (Vàng), ActionFlow (Tím).
+  - Tách bạch cổng nguồn Video: `Track V1`, `Track V2`, `All Below` và định tuyến Background/Foreground trên Blend Node.
+  - Xây dựng cơ chế serialization/deserialization đồ thị sang `.preset.json`.
+- [ ] **Task 3.3 [Hệ Sinh Thái 10+ Atomic Nodes Nền Tảng]:**
+  - `Node Video Source`: Đầu vào hình ảnh từ Clip trên Timeline tại Playhead.
+  - `Node Text Generator`: Sinh chữ động dựa trên `crates/text`, xuất texture RGBA có alpha.
+  - `Node Shape / Solid`: Vẽ nền hộp bo góc, solid matte cho banner/lower-third.
+  - `Node Time / Speed Driver`: Bộ đếm thời gian, tốc độ cuộn ngang Ticker/Marquee, sóng LFO.
+  - `Node Crop / Mask`: Cắt xén vùng hiển thị.
+  - `Node Transform 2D`: Vị trí X/Y, Scale, Rotation, Anchor point, Opacity.
   - `Node Blend / Mix`: Hòa trộn 2 luồng hình ảnh với 26 chế độ blend (Multiply, Screen, Overlay...).
   - `Node Color Grade`: Chỉnh màu cơ bản (Exposure, Contrast, Temp, Tint, Saturation).
   - `Node Keyer`: Tách phông xanh Ultra Key thời gian thực.
+  - `Node AudioReactor`: Trích xuất sóng âm Peak RMS điều khiển rung nảy thông số.
   - `Node Output`: Đầu ra cuối cùng đẩy thẳng lên Viewport / Render Buffer.
-- [ ] **Task 3.4 [Chuyển Đổi 93 WGSL Shaders Sang Atomic Nodes]:**
-  - Kế thừa toàn bộ 93 file Shader WGSL từ `crates/render`, bọc mỗi Shader thành một Node nguyên tử độc lập có cổng Input/Output chuẩn.
-- [ ] **Task 3.5 [Procedural Motion (Audio React)]:**
-  - Tạo Socket đầu ra tín hiệu âm thanh (Audio Peak RMS / Pitch) từ Track Audio để cắm dây điều khiển thông số video (ví dụ: tiếng Bass đập làm video rung giật hoặc đổi màu viền).
-- [ ] **Task 3.6 [Hệ Thống Preset Đồ Thị (.preset.json)]:**
-  - Hỗ trợ lưu và nạp toàn bộ một cụm node phức tạp thành file `.preset.json` độc lập để tái sử dụng và chia sẻ.
-- **Tiêu chuẩn nghiệm thu (DoD 3):** Mở panel Node Graph, kéo dây nối 2 video hòa trộn qua Blend Mode ở 60fps; cắm dây Audio Peak rung lắc Scale của Video; xuất và nạp lại `.preset.json` chính xác 100%.
+- [ ] **Task 3.4 [⬛ Triển Khai Black Node (Compound Subgraph & FX Layer)]:**
+  - Cho phép đóng gói (pack) một nhóm các node thành 1 Black Node duy nhất (Anti-Spaghetti).
+  - Drill-down mở đồ thị con, bộc lộ các cổng Exposed Pins ra ngoài.
+  - Đóng gói cụm node thành file `.preset.json` độc lập; hỗ trợ làm FX Adjustment Layer trên Timeline.
+- [ ] **Task 3.5 [⚡ Triển Khai Action Node & Topological DAG Evaluator]:**
+  - Xây dựng Action Node tự động hóa: Cấu hình Target Scope (Selected Clips, Track, Vùng In/Out) + Nút bấm `[ ▶ Run Workflow ]`.
+  - Bộ duyệt đồ thị phi chu trình Topological Sort phát hiện vòng lặp (Cycle Detection).
+- [ ] **Task 3.6 [💻 Triển Khai Code Node (Custom WGSL JIT & Script Node)]:**
+  - `Custom WGSL Shader Node`: Viết code shader trực tiếp trong node, wgpu JIT compile < 2ms, Hot-reload 60fps, tự động sinh Socket từ biến uniform. Sẵn sàng cho AI Agent bơm code shader.
+  - `Script Action Node`: Chạy Lua script qua `crates/plugin-host` (`mlua`) cho tự động hóa batch logic.
+- [ ] **Task 3.7 [Chuyển Đổi 93 WGSL Shaders & Thay Thế Effect Controls]:**
+  - Đóng gói toàn bộ 93 file Shader WGSL từ `crates/render` thành catalog Atomic Nodes chuẩn.
+  - Thay thế bảng Effect Controls cũ của Premiere bằng Node Graph Panel & Node Inspector.
+- **Tiêu chuẩn nghiệm thu (DoD 3):** Mở panel Node Graph 60fps; tạo dải News Ticker (nền xanh, chữ đen, chạy góc dưới) mượt mà 60fps; phân lập effect trên V1 và V2 đè lên trên; gom cụm thành Black Node và xuất `.preset.json`; nhấn Run trên Action Node áp effect hàng loạt vùng In/Out; gõ code WGSL trong Custom Shader Node JIT compile hiển thị tức thì; RAM luôn `< 2GB` và file `< 700 dòng`.
 
 ---
 
@@ -118,7 +133,7 @@ flowchart TD
 
 ## ⚪ GIAI ĐOẠN 5: AI LOCAL & BUỒNG LÁI TỰ ĐỘNG HÓA MCP (PHASE 5)
 **Trạng thái:** ⚪ **CHỜ TRIỂN KHAI**  
-**Mục tiêu:** Tích hợp mô hình AI chạy Offline nội bộ (Silero VAD băm khoảng lặng, Whisper sinh phụ đề) và mở cổng MCP Server (`rmcp`) cho AI Agent hoặc Antigravity CLI điều khiển tự động toàn bộ phần mềm.
+**Mục tiêu:** Tích hợp mô hình AI chạy Offline nội bộ (Silero VAD băm khoảng lặng, Whisper sinh phụ đề, AI Visual Face Swap / Rembg) và mở cổng MCP Server (`rmcp`) cho AI Agent hoặc Antigravity CLI điều khiển tự động toàn bộ phần mềm.
 
 - [ ] **Task 5.1 [Local Silero VAD Worker]:**
   - Tích hợp Silero VAD qua `ort` (ONNX Runtime) trên luồng ngầm (`crates/ai-workers`).
@@ -126,11 +141,15 @@ flowchart TD
 - [ ] **Task 5.2 [Local Whisper Transcription]:**
   - Nhận diện giọng nói tiếng Việt/tiếng Anh offline bằng Whisper/Moonshine.
   - Tự động sinh clip Subtitle gắn vào timeline và nối dây vào Node Text Karaoke.
-- [ ] **Task 5.3 [MCP Server & Antigravity CLI Driver]:**
+- [ ] **Task 5.3 [AI Visual Inference Node: Face Swap & Background Removal]:**
+  - Tích hợp mô hình Computer Vision ONNX qua `ort` tăng tốc GPU (Vulkan / DirectML).
+  - Triển khai `AiFaceSwapNode` (hoán đổi khuôn mặt / Swiper) và `AiMatteNode` (tách nền người tự động không cần phông xanh).
+  - Nhận luồng Texture GPU từ Node Graph, xử lý per-frame và xuất Texture có kênh Alpha.
+- [ ] **Task 5.4 [MCP Server & Antigravity CLI Driver]:**
   - Mở cổng MCP Server nội bộ bằng `rmcp` trong `apps/darkworks-cli`.
   - Phơi bày toàn bộ lệnh `Session::execute` (cắt clip, nối dây shader, áp preset, tua playhead).
   - Cho phép AI Agent tự động dựng video theo yêu cầu qua terminal.
-- **Tiêu chuẩn nghiệm thu (DoD 5):** Bấm `Auto Cut Silence` băm sạch khoảng lặng video 10 phút dưới 5 giây; điều khiển cắt ghép video từ prompt terminal thành công 100%.
+- **Tiêu chuẩn nghiệm thu (DoD 5):** Bấm `Auto Cut Silence` băm sạch khoảng lặng video 10 phút dưới 5 giây; Whisper tạo phụ đề chuẩn 95%; Face Swap và tách nền AI chạy trơn tru trên Node Graph; điều khiển cắt ghép video từ prompt terminal thành công 100%.
 
 ---
 

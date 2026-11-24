@@ -22,6 +22,7 @@ pub enum PanelKind {
     History,
     Source,
     EffectControls,
+    NodeGraph,
     AudioClipMixer,
     Metadata,
     Program,
@@ -44,7 +45,7 @@ pub enum PanelKind {
 }
 
 impl PanelKind {
-    pub const ALL: [PanelKind; 28] = [
+    pub const ALL: [PanelKind; 29] = [
         PanelKind::Project,
         PanelKind::MediaBrowser,
         PanelKind::Libraries,
@@ -54,6 +55,7 @@ impl PanelKind {
         PanelKind::History,
         PanelKind::Source,
         PanelKind::EffectControls,
+        PanelKind::NodeGraph,
         PanelKind::AudioClipMixer,
         PanelKind::Metadata,
         PanelKind::Program,
@@ -85,6 +87,7 @@ impl PanelKind {
             PanelKind::History => "History",
             PanelKind::Source => "Source",
             PanelKind::EffectControls => "Effect Controls",
+            PanelKind::NodeGraph => "Node Graph",
             PanelKind::AudioClipMixer => "Audio Clip Mixer",
             PanelKind::Metadata => "Metadata",
             PanelKind::Program => "Program",
@@ -522,7 +525,7 @@ fn workspace_root(name: &str) -> Node<PanelKind> {
             Ratio(0.57),
             hsplit(
                 Ratio(0.72),
-                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
+                hsplit(Ratio(0.5), tabs(&[Source, EffectControls, NodeGraph, AudioClipMixer, Metadata], 0), tabs(&[Program], 0)),
                 tabs(&[Properties, EssentialGraphics, Text], 0),
             ),
             hsplit(Ratio(0.29), tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),

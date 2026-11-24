@@ -1,0 +1,30 @@
+//! # Darkworks Node Graph (`darkworks-node-graph`)
+//!
+//! Lõi xử lý đồ thị có hướng không chu trình (DAG) cho Darkworks NLE Video Editor.
+//! Tích hợp `egui_snarl` và các tiện ích tổ chức canvas ComfyUI Style.
+
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+
+pub mod compound;
+pub mod custom_shader;
+pub mod evaluator;
+pub mod group;
+pub mod history;
+pub mod node;
+pub mod node_controls;
+pub mod preset;
+pub mod types;
+pub mod viewer;
+
+pub use compound::{BlackNodeSubgraph, ExposedPin};
+pub use custom_shader::{WgslError, WgslParser, WgslUniform};
+pub use evaluator::{DagError, DagEvaluator, DagExecutionPlan, DagStep, EvaluationContext};
+pub use group::VisualGroup;
+pub use history::{GraphHistory, GraphSnapshot};
+pub use node::{
+    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TimeMode,
+    TransitionType,
+};
+pub use preset::{BuiltinPresetKind, NodeGraphPreset, PresetError};
+pub use types::NodeDataType;
+pub use viewer::{DarkworksViewer, ZoomAction};

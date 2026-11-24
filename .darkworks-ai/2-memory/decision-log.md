@@ -182,3 +182,153 @@
 - **Nạp icon trong ứng dụng (`apps/darkworks/src/main.rs`):**
   - Sửa hàm `app_icon()` nạp trực tiếp `darkworks-256.png` và `darkworks-512.png`.
 - **Nghiệm thu:** Icon trên thanh Taskbar / Dock Linux và tiêu đề window hiển thị chuẩn xác biểu tượng Darkworks. Biên dịch `cargo build --bin darkworks` thành công 100%.
+
+### 26. Kiến Trúc Node Graph Mở Rộng: Text Generator, Black Node & Action Node (2026-11-22)
+- **Bối cảnh & Quyết định:** Khai tử danh sách tuyến tính `Vec<EffectInstance>` cũ của FilmCraft/Premiere, thay thế bằng đồ thị DAG (`egui_snarl`). Mở rộng kiến trúc đồ thị với 3 thành phần cốt lõi:
+  1. **Text Generator Node:** Đưa Text Node thành Node nguyên tử nền tảng ngay trong Phase 3 (dựa trên `crates/text`), sinh texture RGBA có alpha để hòa trộn qua Blend Node đè lên video.
+  2. **Black Node (Compound / Subgraph FX Layer):**
+     - Đóng gói cụm nhiều Atomic Nodes (Text + Glow + Blur + Color Grade...) thành 1 Node duy nhất trên canvas, chống rối đồ thị (Anti-Spaghetti).
+     - Hỗ trợ Drill-down (nhấp đúp mở đồ thị con) và bộc lộ các chân cắm quan trọng (`Exposed Pins`).
+     - Định dạng lưu trữ chuẩn của file `.preset.json`.
+     - Đóng vai trò như một FX Layer / Adjustment Block trên Timeline khi áp dụng cho toàn bộ các layer video bên dưới.
+  3. **Action Node (Workflow Automation & Batch Runner):**
+     - Trạm tự động hóa quy trình dựng video trực quan.
+     - Tiếp nhận phạm vi áp dụng (Target Scope: Selected Clips, Track V1/V2, hoặc Vùng `[Mark In, Mark Out]`).
+     - Có nút bấm `[ ▶ Run Workflow ]` gọi trực tiếp vào hệ thống lệnh nguyên tử `Session::execute` để chỉnh sửa/áp hiệu ứng hàng loạt trên timeline bên dưới.
+     - Hỗ trợ hoàn tác 100% bằng `Ctrl + Z` thông qua snapshot Copy-on-Write.
+
+### 27. Bộ Công Cụ Tổ Chức Đồ Thị Trực Quan Kiểu ComfyUI (Canvas Ergonomics & Organization) (2026-11-22)
+- **Bối cảnh & Quyết định:** Để đồ thị Node Graph không chỉ mạnh về tính toán mà còn trực quan, sạch sẽ và thân thiện với con người khi dự án phình to, Darkworks tích hợp bộ công cụ tổ chức canvas lấy cảm hứng từ ComfyUI, Blender và Unreal Engine:
+  1. **Visual Group / Backdrop Box (Khung phân vùng màu):** Khung hình chữ nhật có màu nền mờ và tiêu đề lớn; khi kéo thanh header của Group, toàn bộ các node con bên trong sẽ di chuyển đồng bộ.
+  2. **Sticky Note Node (Ghi chú / Memo):** Node ghi chú không có socket, hiển thị khung text ghi nhớ, chú thích workflow hoặc nhắc việc (TODO).
+  3. **Reroute Node (Nút bẻ góc dây):** Node chấm tròn nhỏ pass-through giúp bẻ góc dây nối uốn lượn ngăn nắp, tránh dây vắt chéo che khuất mặt node.
+  4. **Canvas Utilities:** Lưới nền Dot-Grid, cơ chế Snap-to-Grid (hít lưới thẳng hàng), phím tắt căn lề tự động (Auto-align), và Minimap ở góc màn hình.
+
+### 28. Kiến Trúc "Code Node" Mở Rộng Vô Hạn Khi Chạm Giới Hạn (Custom WGSL & Script) (2026-11-22)
+- **Bối cảnh & Quyết định:** Để giải quyết bài toán "khi chạm tới giới hạn của các node có sẵn thì làm sao?", Darkworks thiết lập cơ chế Code Node cho phép người dùng hoặc AI Agent tạo hiệu ứng mới ngay lập tức mà không cần build lại app:
+  1. **Custom WGSL Shader Node (GPU JIT):**
+     - Nhúng khung soạn code WGSL trực tiếp trên thân Node.
+     - `wgpu` JIT-compile trực tiếp trên VRAM trong < 2ms, Hot-reload 60fps tức thì.
+     - Tự động phân tích các biến `uniform` khai báo trong shader để tạo ra các socket tham số kéo dây ra ngoài.
+     - Sẵn sàng đón đầu AI Agent (Antigravity CLI): người dùng yêu cầu bằng lời ➔ AI sinh code WGSL bơm thẳng vào node.
+  2. **Script Action Node (CPU Procedural Automation):**
+     - Chạy script Lua qua `crates/plugin-host` (`mlua` / LuaJIT) cho các logic tự động hóa timeline phức tạp.
+  3. **Đóng gói thành Preset:** Code Node có thể đóng gói thành Black Node và xuất file `.preset.json` để chia sẻ cho cộng đồng sử dụng qua các thanh trượt trực quan mà không bị lộ code.
+
+
+### 29. Quy Hoạch AI Visual Inference Node (Face Swap / Swiper & AI Background Removal) Vào Phase 5 (2026-11-22)
+- **Bối cảnh:** Người dùng đặt câu hỏi về khả năng mở rộng AI trong tương lai (tích hợp các mô hình AI xử lý hình ảnh như Swipers/Face Swap hoặc Tách nền AI).
+- **Quyết định kiến trúc:**
+  1. **Phân tách 2 hình thái tích hợp AI:**
+     - **AI Audio & Automation (Whisper, Silero VAD):** Tích hợp dưới dạng `Action Node` hoặc tiến trình ngầm (chạy 1 lần, không render per-frame 60 FPS).
+     - **AI Computer Vision (Face Swap / Swiper, Rembg / AI Matte, Depth-Map):** Tích hợp dưới dạng **AI Visual Node** trên canvas Node Graph: Nhận luồng `Texture` GPU ➔ Gọi inference `crates/ai-workers` (`ort` ONNX GPU) ➔ Xuất `Texture` đã qua xử lý (kèm kênh Alpha).
+  2. **Bổ sung Task 5.3 vào Phase 5:**
+     - Mở rộng năng lực của `crates/ai-workers` phục vụ cả Speech AI lẫn Visual AI.
+     - Khả năng kết hợp tự nhiên trên Node Graph: Ghép `VideoInput` ➔ `AiRembgNode` ➔ `Blend` với nền mờ phía sau để tạo hiệu ứng xóa phông điện ảnh cực nhanh.
+
+
+### 30. Hệ Sinh Thái 18 Versatile Atomic Nodes Bản Đầy Đủ & Kho 5 Built-in Presets Mẫu Cốt Lõi (2026-11-22)
+- **Bối cảnh & Quyết định:** 
+  - Thống nhất nguyên tắc: **Không chia bản Simple / Advanced** gây phức tạp phân mảnh. Toàn bộ 18 Node nguyên tử đều được cung cấp bản đầy đủ 100% (Full Production-Ready) ngay từ đầu.
+  - Hợp nhất 93 Shaders WGSL cũ của FilmCraft thành 18 Node nguyên tử đa năng theo chuẩn Nuke/Fusion (tránh sinh 93 node lẻ gây bãi rác canvas):
+    1. *Generators (4):* `VideoInput`, `TextGenerator`, `ShapeGenerator`, `TimeDriver`.
+    2. *Color & Optics (4):* `ColorGrade` (tích hợp Invert & B&W), `BlurSharpen` (5 loại blur), `DistortLens` (6 loại biến dạng), `Keyer` (Ultra Keyer phông xanh kèm spill suppress).
+    3. *Transform & Compositing (3):* `Transform2D` (kèm Flip H/V & Anchor), `CropMask` (kèm feather), `Blend` (26 chế độ hòa trộn).
+    4. *Transitions (1):* `Transition` (30 kiểu chuyển cảnh).
+    5. *Signals & Automation (2):* `AudioReactor` (lấy RMS Peak tần số âm thanh lái thông số hình ảnh 60 FPS), `ActionNode` (tự động hóa).
+    6. *Advanced & Ergonomics (4):* `BlackNode` (Compound Subgraph), `CustomWgsl` (JIT shader), `StickyNote`, `Reroute Dot`, kèm `Output`.
+  - **Kho 5 Built-in Presets Mẫu Cốt Lõi:** Tích hợp sẵn nạp 1-click trên Toolbar:
+    1. `News Ticker Banner`: Dải tin tức nền xanh bo góc + Text tiêu đề + TimeDriver cuộn ngang + Blend.
+    2. `Continuous Audio Waveform Line`: Shape line 4px + Distort wave + AudioReactor + TimeDriver + Blend Screen (đường sóng nhạc liên tục 60 FPS).
+    3. `Spotlight Invert`: VideoIn + Solid trắng + Shape circle mask + Blend difference (vùng tròn âm bản di chuyển).
+    4. `Audio Beat Invert Flash`: VideoIn + Solid trắng + AudioReactor bass + Blend difference (chớp âm bản theo tiếng trống kick).
+    5. `Cinematic Soft Glow`: VideoIn + Blur Bokeh bloom + Blend screen.
+
+### 31. Hệ Thống Visual Group Đa Năng: Gom Nhóm Nhanh `Ctrl + G`, Kéo Thả Đồng Bộ & Khắc Phục Lỗi Chồng Đè (2026-11-23)
+- **Bối cảnh & Vấn đề giải quyết:**
+  - Người dùng phản ánh khi tạo 2 nhóm từ hộp thoại, cả 2 nhóm đều bị sinh ra tại tọa độ cố định `(120, 120)` đè nghẽn lên nhau gây lỗi rối chữ `gro[p 2121`.
+  - Chưa có tính năng quét chọn nhiều node để gom nhóm nhanh mà phải ném thủ công từng node; chưa có khả năng di chuyển nhóm trên canvas.
+- **Quyết định kiến trúc & Giải pháp:**
+  1. **Phím tắt `Ctrl + G` (hoặc `Cmd + G`):**
+     - Truy vấn danh sách node đang được chọn qua `egui_snarl::ui::get_selected_nodes`.
+     - Tự động tính toán Bounding Box bao quanh tất cả các node được chọn cộng thêm khoảng đệm lề 35px thẩm mỹ.
+     - Tự động sinh tên mặc định `Group {N}` nếu người dùng không đặt tên.
+  2. **Bảng màu xoay vòng tự động (Auto-Rotating Palette):**
+     - Triển khai `VisualGroup::default_color(idx)` xoay vòng qua 6 màu sắc chuẩn ComfyUI/Darkworks (Tím, Xanh dương, Xanh ngọc, Xanh lục, Cam, Đỏ thẫm) độ trong suốt 35%.
+     - Nếu không có node nào chọn, vị trí nhóm mới tự động lệch so le (+50px mỗi nhóm), triệt tiêu hoàn toàn lỗi chồng đè `gro[p 2121`.
+  3. **Tương tác trực tiếp trên Canvas (Direct Manipulation):**
+     - **Header Bar (30px trên cùng):** Nhấp giữ chuột trái kéo thanh tiêu đề sẽ di chuyển cả khung Group VÀ đồng thời tịnh tiến tất cả các Node con nằm bên trong theo đúng độ dời `delta`.
+     - **Tay cầm co giãn góc dưới phải (Resize Grip 20x20px):** Cho phép kéo mở rộng/thu hẹp biên độ khung Group mà không làm dịch chuyển các node bên trong.
+     - **Khóa Panning nền Canvas:** Bắt cờ `is_dragging_group` truyền vào `DarkworksViewer::current_transform` để khóa đứng yên vị trí nền canvas, tránh bị trôi màn hình khi kéo group.
+  4. **Tài liệu đặc tả UX/UI toàn diện:**
+     - Lập bảng ma trận 20 tính năng UX/UI chuẩn chuyên nghiệp tại `.darkworks-ai/3-modules/node-graph/visual_group_ux_specs.md` sẵn sàng cho phiên phát triển tiếp theo.
+
+
+### 32. Hoàn Thiện Bộ Công Cụ Tương Tác Visual Group UX Đạt Chuẩn ComfyUI & Blender (2026-11-24)
+- **Bối cảnh & Quyết định kiến trúc:**
+  - Tiếp tục nâng cấp Visual Group thành công cụ tổ chức đồ thị chuyên nghiệp, mượt mà và trực quan theo bảng đặc tả `visual_group_ux_specs.md`:
+  1. **Inline Rename trên Header Bar (`F2` hoặc Nhấp đúp):**
+     - Nhấp đúp trực tiếp lên Header Bar hoặc bấm phím tắt `F2` (khi rê chuột vào Group) để bật ô nhập liệu `egui::TextEdit::singleline` ngay trên tiêu đề.
+     - Phím `Enter` hoặc click ra ngoài lưu tên mới; phím `Escape` hủy thao tác.
+  2. **Menu Ngữ Cảnh Chuột Phải Đầy Đủ (Context Menu):**
+     - Nhấp chuột phải lên thanh Header Bar để mở menu ngữ cảnh: Đổi tên (Inline Rename), Bảng màu 6 màu ComfyUI dịu mắt (Purple, Blue, Turquoise, Green, Orange, Crimson), Căn vừa Node con (Auto-Fit), Khóa / Mở khóa vị trí (Lock / Unlock), Rã nhóm (Ungroup), Xóa toàn bộ cụm.
+  3. **Phím Tắt Rã Nhóm Nhanh `Ctrl + Shift + G` (Ungroup):**
+     - Hủy khung nhóm Visual Group nhưng **giữ nguyên 100% tất cả Node và dây nối bên trong**.
+     - Tự động ưu tiên rã nhóm chứa các node đang được quét chọn, hoặc nhóm vừa được rê chuột qua.
+  4. **Căn Vừa Tự Động (Auto-Fit to Content):**
+     - Nhấp đúp vào tay cầm co giãn góc dưới phải hoặc chọn "🎯 Auto-Fit" trong Menu để khung Group tự động tính lại Bounding Box bao khít toàn bộ các Node con (+35px padding lề và chừa 40px không gian Header).
+  5. **Chế Độ Khóa Vị Trí (Lock Mode):**
+     - Thêm trường `is_locked: bool` (hỗ trợ `#[serde(default)]` tương thích ngược tuyệt đối).
+     - Khi bị khóa, thanh Header hiển thị biểu tượng 🔒, vô hiệu hóa việc kéo di chuyển và resize để bảo vệ sơ đồ khỏi bấm nhầm.
+  6. **Kiến Trúc Tách Phân Hệ `node_graph_groups.rs` Độc Lập:**
+     - Tách toàn bộ logic tương tác canvas, menu ngữ cảnh, inline rename và hộp thoại quản lý nhóm sang `crates/ui-egui/src/panels/node_graph_groups.rs` (354 dòng).
+     - Giữ `node_graph.rs` (520 dòng) luôn xanh đạt chuẩn thiết quân luật `< 700 dòng`.
+     - Bộ 14/14 tests tích hợp của `darkworks-node-graph` đạt **100% PASS**, clippy sạch 0 lỗi cảnh báo.
+  7. **Khắc Phục Lỗi 01 & Lỗi Khóa Cứng Hai Chiều Khi Kéo Tách Nhóm / Resize Grip (2026-11-24):**
+     - **Nguyên nhân gốc rễ (RCA):**
+       - Lỗi lồng nhóm không tương tác: Hộp va chạm kiểm tra `over_any_node` dùng Bounding Box giả định thô `(220, 160)` của Node cha tạo vùng chết ảo chiếm trọn Header Bar của Group con bên dưới; đồng thời duyệt mảng theo thứ tự xuôi `0..N` khiến Group cha cướp sự kiện của Group con.
+       - Lỗi không kéo tách 2 nhóm ra xa nhau được (Mutual Lock): Việc kiểm tra `old_rect.contains(center)` quá lỏng lẻo khiến hai nhóm chỉ giao cắt một phần (`nhóm 1` và `nhóm 2`) đều chứa tâm của nhau, dẫn đến việc kéo nhóm này thì nhóm kia cũng bị tịnh tiến theo, khóa chặt 2 nhóm vào nhau.
+       - Lỗi tay cầm Resize khó bắt chuột: Tay cầm co giãn chỉ có kích thước 20x20px, quá bé khi hiển thị trên màn hình độ phân giải cao hoặc khi canvas ở tỷ lệ thu phóng (zoom).
+     - **Giải pháp ngoại khoa toàn diện:**
+       - Thu hẹp vùng kiểm tra Header Node (`over_node_header`) chỉ quét thanh tiêu đề ~26px.
+       - Đảo ngược thứ tự duyệt tương tác (`.rev()`) để Group con (nằm trên / tạo sau) luôn có Z-order cao hơn và ưu tiên đón nhận hover/click trước.
+       - Thay thế kiểm tra tâm bằng **Bao hàm nghiêm ngặt 100% (Strict Containment)**: `old_rect.contains(child.min) && old_rect.contains(child.max)`. Hai nhóm chỉ chồng đè một phần hoàn toàn độc lập, kéo tách rời nhau tự do.
+       - Mở rộng vùng tương tác tay cầm co giãn `resize_rect` từ `20px` lên `32px` (tăng diện tích hit-box 2.5 lần), đồng thời vẽ 3 đường rãnh chéo tương phản cao chuẩn đồ họa chuyên nghiệp.
+       - Bổ sung unit test `test_nested_visual_groups_detection_and_translation` bảo vệ hồi quy (14/14 tests PASS).
+
+
+### 33. Đồng Bộ Phím Xóa Toàn Cục (`Delete` / `Backspace`) Cho Node Graph & Tự Động Bắt Tiêu Điểm (2026-11-24)
+- **Bối cảnh & RCA:**
+  - Người dùng quét chọn hàng loạt Node (`Shift + drag`) hoặc rê chuột vào Visual Group và nhấn `Delete` nhưng không có phản hồi.
+  - RCA: `node_graph::show` ban đầu chưa cập nhật tiêu điểm `app.ui.focused = PanelKind::NodeGraph`, trong khi phím `Delete` bị bộ điều phối toàn cục `FilmcraftApp::handle_shortcuts` nuốt (`consume_chord`) từ đầu frame và điều hướng nhầm về Timeline.
+- **Quyết định kiến trúc & Giải pháp:**
+  1. **Tự động bắt tiêu điểm:** Gán `app.ui.focused = PanelKind::NodeGraph` ngay khi con trỏ chuột tương tác (click, drag) trong vùng Node Graph.
+  2. **Bắt chặn thông minh trong `keys.rs`:** Khi nhận lệnh `edit.clear` hoặc `edit.rippleDelete` (`Delete` / `Backspace`), nếu tiêu điểm là `NodeGraph` hoặc Node Graph có node/group đang chọn (`has_selection`), hệ thống ưu tiên gọi `delete_selected_or_hovered` xóa ngay lập tức cho Node Graph và chặn rơi xuống Timeline.
+  3. **Nút xóa trực quan trên Toolbar:** Bổ sung nút `🗑 Delete` trên thanh công cụ trên cùng để hỗ trợ thao tác chuột nhanh.
+  4. **Kiểm toán an toàn:** Duy trì toàn bộ file < 700 dòng (`node_graph.rs`: 682 dòng, `keys.rs`: 517 dòng), zero panics, 15/15 unit tests PASS.
+
+
+### 34. Tích Hợp Ngăn Xếp Lịch Sử Undo / Redo (`GraphHistory`) Cho Node Graph (2026-11-24)
+- **Bối cảnh & RCA:**
+  - Người dùng lỡ xóa node hoặc rã group nhưng bấm `Ctrl + Z` không khôi phục lại được.
+  - RCA: `NodeGraphState` lưu trạng thái đồ thị trực tiếp mà không có snapshot dự phòng; lệnh `edit.undo` (`Ctrl + Z`) từ đầu frame được FilmCraft điều hướng xuống Timeline.
+- **Quyết định kiến trúc & Giải pháp:**
+  1. **Module `GraphHistory` & `GraphSnapshot` (`crates/node-graph/src/history.rs`):** Lưu trữ ngăn xếp ảnh chụp trạng thái `Snarl<DarkNode>`, `groups`, `custom_titles` với độ sâu tối đa 50 bước (< 5MB RAM).
+  2. **Tự động chụp Snapshot:** Gọi `state.push_undo()` trước mọi thao tác xóa (`Delete`, `node_to_remove`), gom nhóm (`Ctrl + G`), rã nhóm (`Ctrl + Shift + G`), dọn sạch (`Clear All`), nạp preset (`Load Preset`).
+  3. **Điều phối Phím tắt `Ctrl + Z` & `Ctrl + Y`:** Bắt chặn trong `keys.rs` khi tiêu điểm ở Node Graph để gọi `node_graph::undo` / `node_graph::redo`.
+  4. **Nút bấm trực quan:** Bổ sung 2 nút `↶ Undo` và `↷ Redo` trên thanh công cụ Node Graph (tự động bật/tắt theo `can_undo` / `can_redo`).
+  5. **Tách module `node_graph_menus.rs`:** Đưa menu thêm node và nạp preset ra module riêng (247 dòng), giúp `node_graph.rs` giảm mạnh từ 682 xuống 577 dòng (< 700 dòng).
+
+
+### 35. Khắc Phục Triệt Để Lỗi Node Mất Snapshot Undo Khi Xóa (`Ctrl + Delete` / `Delete`) (2026-11-24)
+- **Bối cảnh & RCA:**
+  - Người dùng xóa node bằng tổ hợp `Ctrl + Delete` (hoặc `Delete`), node biến mất nhưng nút `↶ Undo` bị xám và `Ctrl + Z` không hồi phục được node (trong khi Group vẫn Undo được).
+  - RCA:
+    1. `vendor/egui-snarl/src/ui.rs` (dòng 1252-1260) có cơ chế tự tiện xóa node khỏi `snarl` bên trong hàm render `snarl.show()` mà không hề gọi `push_undo()`. Cụ thể `i.key_pressed(Key::Delete)` luôn trả về true cả khi giữ Ctrl.
+    2. `snarl_id` bị lệch định danh giữa Ui cha và `canvas_ui` con, khiến `get_selected_nodes` ở ngoài truy vấn sai ID và nhận danh sách rỗng.
+    3. `keys.rs` bỏ lọt tổ hợp `Ctrl + Delete` / `Ctrl + Backspace`.
+- **Quyết định kiến trúc & Giải pháp:**
+  1. **Xóa bỏ cơ chế xóa ngầm trong `vendor/egui-snarl`:** Chuyển giao 100% quyền kiểm soát vòng đời xóa node cho Darkworks để đảm bảo luôn lưu snapshot Undo.
+  2. **Chuẩn hóa ID với `SnarlWidget::new().id(...)`:** Đảm bảo `snarl_canvas_id` cố định nhất quán 100% giữa lúc render và lúc đọc danh sách chọn.
+  3. **Bắt trọn `Ctrl + Delete` & `consume_key`:** Tiêu thụ chính xác các sự kiện phím trong cả `keys.rs` và `node_graph.rs`, ngăn ngừa hiện tượng lặp phím.
+  4. **Xóa vùng chọn sau khi xóa:** Gọi `egui_snarl::ui::deselect_all_nodes` để làm sạch trạng thái chọn. Nút `↶ Undo` lập tức sáng đèn và `Ctrl + Z` hồi phục đầy đủ node cùng dây nối.

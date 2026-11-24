@@ -41,6 +41,15 @@ impl FilmcraftApp {
             let _ = self.session.execute("trim.cancelDynamic", json!({}));
         }
         panels::masks::pen_take_back(self, ctx, text_focused);
+        if self.ui.focused == PanelKind::NodeGraph && !text_focused {
+            let ctrl_delete = ctx.input_mut(|i| {
+                let ctrl = i.modifiers.command || i.modifiers.ctrl;
+                ctrl && (i.consume_key(i.modifiers, egui::Key::Delete) || i.consume_key(i.modifiers, egui::Key::Backspace))
+            });
+            if ctrl_delete {
+                crate::panels::node_graph::delete_selected_or_hovered(ctx);
+            }
+        }
         let fire = ctx.input_mut(|i| self.match_shortcuts(i, text_focused, divider_focused, label_selected));
         self.fire_shortcuts(ctx, fire);
     }
@@ -191,6 +200,26 @@ impl FilmcraftApp {
                     self.ui.status = e;
                 }
                 continue;
+            }
+            // Clear in Node Graph removes the selected nodes or hovered group.
+            if matches!(id.as_str(), "edit.clear" | "edit.rippleDelete") {
+                if self.ui.focused == PanelKind::NodeGraph {
+                    crate::panels::node_graph::delete_selected_or_hovered(ctx);
+                    continue;
+                }
+                if crate::panels::node_graph::has_selection(ctx) && crate::panels::node_graph::delete_selected_or_hovered(ctx) {
+                    self.ui.focused = PanelKind::NodeGraph;
+                    continue;
+                }
+            }
+            // Undo / Redo in Node Graph when it has focus
+            if self.ui.focused == PanelKind::NodeGraph {
+                if id == "edit.undo" && crate::panels::node_graph::undo(ctx) {
+                    continue;
+                }
+                if id == "edit.redo" && crate::panels::node_graph::redo(ctx) {
+                    continue;
+                }
             }
             // Mark In/Out in the Source monitor when it has focus.
             let params = if let Some(p) = clear {
