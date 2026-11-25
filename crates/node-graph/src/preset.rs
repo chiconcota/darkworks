@@ -84,12 +84,12 @@ impl NodeGraphPreset {
 
         let shape_id = snarl.insert_node(
             Pos2::new(80.0, 100.0),
-            DarkNode::ShapeGenerator {
-                shape_type: ShapeType::RoundedRectangle,
-                size: [1920.0, 80.0],
-                corner_radius: 8.0,
-                color: [0.0, 0.9, 0.4, 1.0], // Neon Green
-            },
+            DarkNode::default_shape(
+                ShapeType::RoundedRectangle,
+                [1920.0, 80.0],
+                8.0,
+                [0.0, 0.9, 0.4, 1.0], // Neon Green
+            ),
         );
 
         let text_id = snarl.insert_node(
@@ -100,15 +100,19 @@ impl NodeGraphPreset {
                 color: [0.0, 0.0, 0.0, 1.0], // Black text
                 tracking: 1.0,
                 line_spacing: 1.2,
+                position: [0.0, 0.0],
+                align: Default::default(),
+                font_family: String::new(),
+                bold: true,
+                italic: false,
+                stroke_color: [0.0, 0.0, 0.0, 1.0],
+                stroke_width: 0.0,
             },
         );
 
         let time_id = snarl.insert_node(
             Pos2::new(80.0, 420.0),
-            DarkNode::TimeDriver {
-                speed: 2.0,
-                mode: TimeMode::Linear,
-            },
+            DarkNode::default_time_driver(2.0, TimeMode::Linear),
         );
 
         let blend_id = snarl.insert_node(
@@ -155,48 +159,36 @@ impl NodeGraphPreset {
         // 1. Sinh đường thẳng ngang 4px
         let line_id = snarl.insert_node(
             Pos2::new(80.0, 80.0),
-            DarkNode::ShapeGenerator {
-                shape_type: ShapeType::Rectangle,
-                size: [1920.0, 4.0],
-                corner_radius: 0.0,
-                color: [0.0, 0.9, 1.0, 1.0], // Neon Cyan Line
-            },
+            DarkNode::default_shape(
+                ShapeType::Rectangle,
+                [1920.0, 4.0],
+                0.0,
+                [0.0, 0.9, 1.0, 1.0], // Neon Cyan Line
+            ),
         );
 
         // 2. AudioReactor bắt nhịp Master Peak
         let audio_id = snarl.insert_node(
             Pos2::new(80.0, 240.0),
-            DarkNode::AudioReactor {
-                band: AudioBand::MasterPeak,
-                multiplier: 2.0,
-                smooth: 0.3,
-            },
+            DarkNode::default_audio_reactor(AudioBand::MasterPeak, 2.0, 0.3),
         );
 
         // 3. TimeDriver cuộn sóng chạy liên tục
         let time_id = snarl.insert_node(
             Pos2::new(80.0, 380.0),
-            DarkNode::TimeDriver {
-                speed: 3.0,
-                mode: TimeMode::Linear,
-            },
+            DarkNode::default_time_driver(3.0, TimeMode::Linear),
         );
 
         // 4. DistortLens (Ripple / Wave) biến đường thẳng thành sóng sin uốn lượn
         let distort_id = snarl.insert_node(
             Pos2::new(380.0, 120.0),
-            DarkNode::DistortLens {
-                distort_type: DistortType::RippleWave,
-                intensity: 0.8,
-                radius: 1.0,
-                center: [0.0, 0.0],
-            },
+            DarkNode::default_distort(DistortType::RippleWave, 0.8, 1.0, [0.0, 0.0]),
         );
 
         // 5. Video Input (Phim nền)
         let video_in_id = snarl.insert_node(
             Pos2::new(380.0, 320.0),
-            DarkNode::VideoInput { track_name: "V1".to_string() },
+            DarkNode::VideoInput { track_name: "Auto".to_string() },
         );
 
         // 6. Blend (Screen hòa sóng nhạc phát sáng lên nền video)
@@ -257,17 +249,17 @@ impl NodeGraphPreset {
 
         let video_in_id = snarl.insert_node(
             Pos2::new(80.0, 80.0),
-            DarkNode::VideoInput { track_name: "V1".to_string() },
+            DarkNode::VideoInput { track_name: "Auto".to_string() },
         );
 
         let solid_white_id = snarl.insert_node(
             Pos2::new(80.0, 220.0),
-            DarkNode::ShapeGenerator {
-                shape_type: ShapeType::SolidMatte,
-                size: [1920.0, 1080.0],
-                corner_radius: 0.0,
-                color: [1.0, 1.0, 1.0, 1.0], // Pure White
-            },
+            DarkNode::default_shape(
+                ShapeType::SolidMatte,
+                [1920.0, 1080.0],
+                0.0,
+                [1.0, 1.0, 1.0, 1.0], // Pure White
+            ),
         );
 
         let circle_mask_id = snarl.insert_node(
@@ -277,6 +269,10 @@ impl NodeGraphPreset {
                 size: [400.0, 400.0],
                 corner_radius: 0.0,
                 color: [1.0, 1.0, 1.0, 1.0],
+                position: [0.0, 0.0],
+                stroke_width: 0.0,
+                stroke_color: [1.0, 1.0, 1.0, 1.0],
+                feather: 18.0,
             },
         );
 
@@ -330,26 +326,22 @@ impl NodeGraphPreset {
 
         let video_in_id = snarl.insert_node(
             Pos2::new(80.0, 80.0),
-            DarkNode::VideoInput { track_name: "V1".to_string() },
+            DarkNode::VideoInput { track_name: "Auto".to_string() },
         );
 
         let solid_white_id = snarl.insert_node(
             Pos2::new(80.0, 220.0),
-            DarkNode::ShapeGenerator {
-                shape_type: ShapeType::SolidMatte,
-                size: [1920.0, 1080.0],
-                corner_radius: 0.0,
-                color: [1.0, 1.0, 1.0, 1.0],
-            },
+            DarkNode::default_shape(
+                ShapeType::SolidMatte,
+                [1920.0, 1080.0],
+                0.0,
+                [1.0, 1.0, 1.0, 1.0],
+            ),
         );
 
         let audio_id = snarl.insert_node(
             Pos2::new(80.0, 360.0),
-            DarkNode::AudioReactor {
-                band: AudioBand::Bass,
-                multiplier: 1.8,
-                smooth: 0.1, // Phản ứng cực nhạy với tiếng trống kick
-            },
+            DarkNode::default_audio_reactor(AudioBand::Bass, 1.8, 0.1),
         );
 
         let blend_id = snarl.insert_node(
@@ -395,17 +387,12 @@ impl NodeGraphPreset {
 
         let video_in_id = snarl.insert_node(
             Pos2::new(80.0, 120.0),
-            DarkNode::VideoInput { track_name: "V1".to_string() },
+            DarkNode::VideoInput { track_name: "Auto".to_string() },
         );
 
         let blur_id = snarl.insert_node(
             Pos2::new(380.0, 240.0),
-            DarkNode::BlurSharpen {
-                blur_type: BlurType::BokehBloom,
-                radius: 25.0,
-                angle_deg: 0.0,
-                highlight_boost: 1.5,
-            },
+            DarkNode::default_blur(BlurType::BokehBloom, 25.0, 0.0, 1.5),
         );
 
         let blend_id = snarl.insert_node(
@@ -461,5 +448,12 @@ impl NodeGraphPreset {
             BuiltinPresetKind::AudioBeatFlash => Self::build_audio_beat_flash_preset(),
             BuiltinPresetKind::CinematicSoftGlow => Self::build_cinematic_glow_preset(),
         }
+    }
+
+    /// Trả về [`darkworks_node_graph_core::NodeGraphDoc`] của Preset mẫu để hỗ trợ Replace/Chain.
+    #[must_use]
+    pub fn builtin_doc(kind: BuiltinPresetKind) -> darkworks_node_graph_core::NodeGraphDoc {
+        let (snarl, groups) = Self::load_builtin(kind);
+        crate::doc::doc_from_snarl(&snarl, &groups, &std::collections::HashMap::new())
     }
 }

@@ -289,10 +289,15 @@ fn seq_canvas(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, s
                 continue;
             }
             let below = canvas.snapshot();
-            if item.node_graph.is_some()
+            if let Some(doc) = item.node_graph.as_deref()
                 && let Some(adj) = node_graph::eval_item_graph(project, seq, item, t, opts, sources, None, Some(&below))
             {
-                canvas.set(adj);
+                if node_graph::graph_has_video_input(doc) {
+                    canvas.set(adj);
+                } else {
+                    blend::composite(canvas.get(), &adj, 1.0, Blend::Normal);
+                    pool::recycle_f32(adj.px);
+                }
                 continue;
             }
             let (adj, bl) = adjustment_layer(project, seq, item, t, opts, &tc, &below);
@@ -354,7 +359,7 @@ fn seq_canvas(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, s
     canvas
 }
 
-fn is_adjustment(project: &Project, item: &TrackItem) -> bool {
+pub(crate) fn is_adjustment(project: &Project, item: &TrackItem) -> bool {
     project.item(item.item).is_some_and(|pi| matches!(pi.kind, ItemKind::AdjustmentLayer { .. }))
 }
 

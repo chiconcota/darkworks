@@ -365,12 +365,12 @@ mod tests {
                 NodeEntry {
                     id: 0,
                     pos: [0.0, 0.0],
-                    node: DarkNode::ShapeGenerator {
-                        shape_type: ShapeType::SolidMatte,
-                        size: [1920.0, 1080.0],
-                        corner_radius: 0.0,
-                        color: [0.1, 0.8, 0.3, 1.0],
-                    },
+                    node: DarkNode::default_shape(
+                        ShapeType::SolidMatte,
+                        [1920.0, 1080.0],
+                        0.0,
+                        [0.1, 0.8, 0.3, 1.0],
+                    ),
                     custom_title: None,
                 },
                 NodeEntry {

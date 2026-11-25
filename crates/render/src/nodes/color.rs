@@ -6,55 +6,111 @@ use rayon::prelude::*;
 use crate::gpufx::FxOp;
 use crate::image::Image;
 
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_color_grade(
-    img: &mut Image,
-    exposure: f32,
-    contrast: f32,
-    saturation: f32,
-    temperature: f32,
-    tint: f32,
-    gamma: f32,
-    invert: bool,
-    black_and_white: bool,
-    tint_color: [f32; 4],
-    tint_amount: f32,
-) {
+/// Tham số chỉnh màu mở rộng của `ColorGrade` Node (bao gồm toàn bộ bộ điều khiển Lumetri cơ bản + Split Tone).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ColorGradeParams {
+    pub exposure: f32,
+    pub contrast: f32,
+    pub saturation: f32,
+    pub temperature: f32,
+    pub tint: f32,
+    pub gamma: f32,
+    pub invert: bool,
+    pub black_and_white: bool,
+    pub tint_color: [f32; 4],
+    pub tint_amount: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub vibrance: f32,
+    pub faded_film: f32,
+    pub shadow_tint: [f32; 3],
+    pub highlight_tint: [f32; 3],
+}
+
+pub(crate) fn apply_color_grade(img: &mut Image, p: &ColorGradeParams) {
     // 1. B&W và Invert chạy trước để các bước chỉnh màu/nhuộm màu tiếp theo hoạt động đúng trên kết quả
-    if black_and_white {
+    if p.black_and_white {
         FxOp::BlackWhite.apply(img);
     }
-    if invert {
+    if p.invert {
         FxOp::Invert { channel: 0, blend: 0.0 }.apply(img);
     }
-    if exposure.abs() > 1e-4 || (contrast - 1.0).abs() > 1e-4 || (saturation - 1.0).abs() > 1e-4 {
-        FxOp::ProcAmp {
-            br: exposure * 0.25,
-            co: contrast.max(0.0),
-            hue: 0.0,
-            sat: saturation.max(0.0),
+
+    let has_split_tone = p.shadow_tint.iter().any(|&v| (v - 0.5).abs() > 1e-3)
+        || p.highlight_tint.iter().any(|&v| (v - 0.5).abs() > 1e-3);
+    let use_lumetri = p.highlights.abs() > 1e-3
+        || p.shadows.abs() > 1e-3
+        || p.whites.abs() > 1e-3
+        || p.blacks.abs() > 1e-3
+        || p.vibrance.abs() > 1e-3
+        || p.faded_film.abs() > 1e-3
+        || has_split_tone;
+
+    if use_lumetri {
+        let temp = (p.temperature / 100.0).clamp(-1.5, 1.5);
+        let tint = (p.tint / 100.0).clamp(-1.5, 1.5);
+        let gains = [1.0 + 0.35 * temp, 1.0 - 0.3 * tint, 1.0 - 0.35 * temp];
+        let aspect = if img.h > 0 {
+            (img.w as f32 / img.h as f32).max(1e-4)
+        } else {
+            1.0
+        };
+        FxOp::Lumetri {
+            gains,
+            exposure: 2.0_f32.powf(p.exposure.clamp(-5.0, 5.0)),
+            contrast: (p.contrast - 1.0).clamp(-1.0, 2.0),
+            hl: p.highlights / 100.0,
+            sh: p.shadows / 100.0,
+            wh: p.whites / 100.0,
+            bl: p.blacks / 100.0,
+            sat: p.saturation.max(0.0),
+            creative_on: has_split_tone || p.faded_film.abs() > 1e-3 || p.vibrance.abs() > 1e-3,
+            faded: (p.faded_film / 100.0).clamp(0.0, 1.0),
+            vib: p.vibrance / 100.0,
+            st: p.shadow_tint,
+            ht: p.highlight_tint,
+            vignette_on: false,
+            va: 0.0,
+            vmid: 0.5,
+            vround: 0.0,
+            vfeather: 0.5,
+            aspect,
+            gpu_capable: true,
         }
         .apply(img);
-    }
-    if temperature.abs() > 1e-4 || tint.abs() > 1e-4 {
-        let t = temperature * 0.2;
-        let tn = tint * 0.2;
-        FxOp::ColorBalance {
-            sh: [t, -tn, -t],
-            md: [t, -tn, -t],
-            hi: [t, -tn, -t],
-            preserve: true,
+    } else {
+        if p.exposure.abs() > 1e-4 || (p.contrast - 1.0).abs() > 1e-4 || (p.saturation - 1.0).abs() > 1e-4 {
+            FxOp::ProcAmp {
+                br: p.exposure * 0.25,
+                co: p.contrast.max(0.0),
+                hue: 0.0,
+                sat: p.saturation.max(0.0),
+            }
+            .apply(img);
         }
-        .apply(img);
+        if p.temperature.abs() > 1e-4 || p.tint.abs() > 1e-4 {
+            let t = p.temperature * 0.2;
+            let tn = p.tint * 0.2;
+            FxOp::ColorBalance {
+                sh: [t, -tn, -t],
+                md: [t, -tn, -t],
+                hi: [t, -tn, -t],
+                preserve: true,
+            }
+            .apply(img);
+        }
     }
-    if (gamma - 1.0).abs() > 1e-4 {
-        FxOp::Gamma { g: gamma.clamp(0.1, 5.0) }.apply(img);
+
+    if (p.gamma - 1.0).abs() > 1e-4 {
+        FxOp::Gamma { g: p.gamma.clamp(0.1, 5.0) }.apply(img);
     }
-    if tint_amount > 1e-4 {
+    if p.tint_amount > 1e-4 {
         FxOp::Tint {
             black: [0.0, 0.0, 0.0],
-            white: [tint_color[0], tint_color[1], tint_color[2]],
-            amount: tint_amount.clamp(0.0, 1.0),
+            white: [p.tint_color[0], p.tint_color[1], p.tint_color[2]],
+            amount: p.tint_amount.clamp(0.0, 1.0),
         }
         .apply(img);
     }

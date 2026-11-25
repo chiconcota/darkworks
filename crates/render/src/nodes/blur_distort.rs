@@ -3,7 +3,7 @@
 use darkworks_node_graph_core::{BlurType, DistortType};
 use rayon::prelude::*;
 
-use crate::effects::{gaussian_boxes, warp};
+use crate::effects::{box_blur, gaussian_boxes, mosaic, warp};
 use crate::gpufx::FxOp;
 use crate::image::Image;
 
@@ -13,6 +13,7 @@ pub(crate) fn apply_blur_sharpen(
     radius: f32,
     angle_deg: f32,
     highlight_boost: f32,
+    threshold: f32,
     scale: f32,
 ) {
     let r = (radius * scale).max(0.0);
@@ -20,9 +21,13 @@ pub(crate) fn apply_blur_sharpen(
         return;
     }
     match blur_type {
-        BlurType::Gaussian | BlurType::Box => {
+        BlurType::Gaussian => {
             let (rx, ry) = gaussian_boxes(img.w, img.h, r, r);
             FxOp::Gaussian { rx, ry, repeat: true }.apply(img);
+        }
+        BlurType::Box => {
+            let box_r = (r.round() as u32).max(1);
+            box_blur(img, &[box_r], &[box_r], true);
         }
         BlurType::Directional => {
             let rad = angle_deg.to_radians();
@@ -37,7 +42,7 @@ pub(crate) fn apply_blur_sharpen(
             FxOp::Bokeh {
                 levels: 2,
                 boost: highlight_boost.max(0.0),
-                threshold: 0.65,
+                threshold: threshold.clamp(0.0, 1.0),
                 sides: 0,
                 rot: 0.0,
                 rr: r,
@@ -50,20 +55,22 @@ pub(crate) fn apply_blur_sharpen(
             FxOp::Unsharp {
                 rx,
                 ry,
-                amount: highlight_boost.max(0.5),
-                threshold: 0.02,
+                amount: highlight_boost.max(0.2),
+                threshold: (threshold * 0.2).clamp(0.0, 0.5),
             }
             .apply(img);
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_distort(
     img: &mut Image,
     distort_type: DistortType,
     intensity: f32,
     radius: f32,
     center: [f32; 2],
+    feather: f32,
     time_sec: f64,
     scale: f32,
 ) {
@@ -73,7 +80,7 @@ pub(crate) fn apply_distort(
                 amount: intensity,
                 midpoint: radius.clamp(0.0, 1.0),
                 roundness: 0.0,
-                feather: 0.4,
+                feather: feather.clamp(0.01, 1.0),
                 target: [0.0, 0.0, 0.0],
             }
             .apply(img);
@@ -114,6 +121,38 @@ pub(crate) fn apply_distort(
                     row[x * 4..x * 4 + 4].copy_from_slice(&[r, g_a[1], b, g_a[3]]);
                 }
             });
+        }
+        DistortType::Mirror => {
+            let rad = (intensity * 180.0).to_radians();
+            let cx = img.w as f32 * (0.5 + center[0] * 0.5);
+            let cy = img.h as f32 * (0.5 + center[1] * 0.5);
+            FxOp::Mirror {
+                cx,
+                cy,
+                nx: rad.cos(),
+                ny: rad.sin(),
+            }
+            .apply(img);
+        }
+        DistortType::Offset => {
+            let w = img.w.max(1) as f32;
+            let h = img.h.max(1) as f32;
+            let dx = (center[0] * w * 0.5).rem_euclid(w);
+            let dy = (center[1] * h * 0.5).rem_euclid(h);
+            FxOp::Offset {
+                dx,
+                dy,
+                blend: (1.0 - feather).clamp(0.0, 1.0),
+            }
+            .apply(img);
+        }
+        DistortType::Posterize => {
+            let levels = (2.0 + intensity.abs() * 14.0).clamp(2.0, 64.0);
+            FxOp::Posterize { n: levels }.apply(img);
+        }
+        DistortType::Pixelate => {
+            let block = ((intensity.abs() * 32.0 + radius * 8.0) * scale).round().max(2.0) as usize;
+            mosaic(img, block, block);
         }
     }
 }

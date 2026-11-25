@@ -110,10 +110,11 @@ flowchart TD
 - [ ] **Task 3.7 [Chuyển Đổi 93 WGSL Shaders & Thay Thế Effect Controls]:**
   - Đóng gói toàn bộ 93 file Shader WGSL từ `crates/render` thành catalog Atomic Nodes chuẩn.
   - Thay thế bảng Effect Controls cũ của Premiere bằng Node Graph Panel & Node Inspector.
-- [ ] **Task 3.8 [Kho Preset `.preset.json` Thật (Export / Import / Thư Viện Preset Lưu Sẵn)]:**
-  - Nâng cấp `💾 Export Preset` dùng hộp thoại file `FileDialog::save_as` lưu file `.preset.json` thật trên ổ đĩa dựa theo cấu trúc `NodeGraphDoc` đầy đủ (`nodes`, `pos`, `custom_title`, `wires`, `groups`) thay vì chỉ copy Clipboard.
-  - Thêm `📥 Import Preset…` (`FileDialog::open_file`) và lưu vào thư mục User Presets để tự động quét hiện ngay trong **Thư viện Preset** dùng 1-click.
-  - Hỗ trợ 2 chế độ khi áp Preset lên Clip đang có Node Graph: **Thay thế (Replace)** hoặc **Nối tiếp trước `Final Output` (Chain/Append)**.
+- [x] **Task 3.8 [Kho Preset `.preset.json` Thật (Export / Import / Thư Viện Preset Lưu Sẵn)]:**
+  - Đã chuẩn hóa `NodeGraphPresetDoc` (đầy đủ `nodes`, `pos`, `custom_title`, `wires`, `groups`), `💾 Save Preset` vào thư mục `<data_dir>/Node Presets/` dùng chung giữa các project, `💾 Export .preset.json`, `📥 Import Preset` và chế độ **Replace / Chain**.
+- [ ] **Task 3.9 [Node & Preset Library Browser (Tìm kiếm, Lọc, Thumbnail Preview & Kéo-Thả)]:**
+  - Thay menu thả xuống nhỏ bằng **Node & Preset Library Browser** (Search bar, Category chips, Favorites, lưới Thumbnail xem trước tự render qua Node Graph, Quick Search `Tab` trên Canvas).
+  - Chuyển `lumetri_presets` sang `ColorGrade` Presets (giữ thumbnail preview) và đóng gói Micro-Presets từ các Atomic Nodes, hỗ trợ kéo thả thẳng lên Clip trên Timeline.
 - **Tiêu chuẩn nghiệm thu (DoD 3):** Mở panel Node Graph 60fps; tạo dải News Ticker (nền xanh, chữ đen, chạy góc dưới) mượt mà 60fps; phân lập effect trên V1 và V2 đè lên trên; Export/Import file `.preset.json` giữ nguyên 100% dây nối & vị trí node; nhấn Run trên Action Node áp effect hàng loạt vùng In/Out; gõ code WGSL trong Custom Shader Node JIT compile hiển thị tức thì; RAM luôn `< 2GB` và file `< 700 dòng`.
 
 ---

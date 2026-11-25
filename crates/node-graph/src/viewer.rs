@@ -194,29 +194,29 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         ui.separator();
 
         ui.menu_button("🎬 Media & Generators", |ui| {
-            if ui.button("🎬 Video Input").clicked() { snarl.insert_node(pos, DarkNode::VideoInput { track_name: "V1".into() }); ui.close(); }
-            if ui.button("🔤 Text Generator").clicked() { snarl.insert_node(pos, DarkNode::TextGenerator { text: "Text".into(), font_size: 36.0, color: [1.0; 4], tracking: 0.0, line_spacing: 1.0 }); ui.close(); }
-            if ui.button("🟩 Shape Generator").clicked() { snarl.insert_node(pos, DarkNode::ShapeGenerator { shape_type: ShapeType::RoundedRectangle, size: [400.0, 120.0], corner_radius: 12.0, color: [0.0, 0.8, 1.0, 1.0] }); ui.close(); }
-            if ui.button("⏱️ Time Driver").clicked() { snarl.insert_node(pos, DarkNode::TimeDriver { speed: 1.0, mode: TimeMode::Linear }); ui.close(); }
+            if ui.button("🎬 Video Input").clicked() { snarl.insert_node(pos, DarkNode::VideoInput { track_name: "Auto".into() }); ui.close(); }
+            if ui.button("🔤 Text Generator").clicked() { snarl.insert_node(pos, DarkNode::default_text("Text")); ui.close(); }
+            if ui.button("🟩 Shape Generator").clicked() { snarl.insert_node(pos, DarkNode::default_shape(ShapeType::RoundedRectangle, [400.0, 120.0], 12.0, [0.0, 0.8, 1.0, 1.0])); ui.close(); }
+            if ui.button("⏱️ Time Driver").clicked() { snarl.insert_node(pos, DarkNode::default_time_driver(1.0, TimeMode::Linear)); ui.close(); }
             if ui.button("🖥️ Final Output").clicked() { snarl.insert_node(pos, DarkNode::Output); ui.close(); }
         });
 
         ui.menu_button("🎨 Color & Keying", |ui| {
-            if ui.button("🎨 Color Grade").clicked() { snarl.insert_node(pos, DarkNode::ColorGrade { exposure: 0.0, contrast: 1.0, saturation: 1.0, temperature: 0.0, tint: 0.0, gamma: 1.0, invert: false, black_and_white: false, tint_color: [1.0, 1.0, 1.0, 1.0], tint_amount: 0.0 }); ui.close(); }
+            if ui.button("🎨 Color Grade").clicked() { snarl.insert_node(pos, DarkNode::default_color_grade()); ui.close(); }
             if ui.button("🟢 Ultra Keyer").clicked() { snarl.insert_node(pos, DarkNode::Keyer { key_color: [0.0, 1.0, 0.0], similarity: 0.4, smoothness: 0.1, spill_suppress: 0.5 }); ui.close(); }
         });
 
         ui.menu_button("📐 Transform & Motion", |ui| {
             if ui.button("📐 Transform 2D").clicked() { snarl.insert_node(pos, DarkNode::Transform2D { position: [0.0, 0.0], scale: [1.0, 1.0], rotation_deg: 0.0, anchor: [0.5, 0.5], opacity: 1.0, flip_h: false, flip_v: false }); ui.close(); }
-            if ui.button("💧 Blur / Sharpen").clicked() { snarl.insert_node(pos, DarkNode::BlurSharpen { blur_type: BlurType::Gaussian, radius: 10.0, angle_deg: 0.0, highlight_boost: 0.0 }); ui.close(); }
-            if ui.button("🌀 Distort / Lens").clicked() { snarl.insert_node(pos, DarkNode::DistortLens { distort_type: DistortType::Vignette, intensity: 0.5, radius: 0.8, center: [0.5, 0.5] }); ui.close(); }
+            if ui.button("💧 Blur / Sharpen").clicked() { snarl.insert_node(pos, DarkNode::default_blur(BlurType::Gaussian, 10.0, 0.0, 1.0)); ui.close(); }
+            if ui.button("🌀 Distort / Lens").clicked() { snarl.insert_node(pos, DarkNode::default_distort(DistortType::Vignette, 0.5, 0.8, [0.0, 0.0])); ui.close(); }
             if ui.button("✂️ Crop / Mask").clicked() { snarl.insert_node(pos, DarkNode::CropMask { top: 0.0, bottom: 0.0, left: 0.0, right: 0.0, feather: 0.0 }); ui.close(); }
         });
 
         ui.menu_button("🔀 Composite & Utilities", |ui| {
             if ui.button("🎭 Blend").clicked() { snarl.insert_node(pos, DarkNode::Blend { mode: crate::node::BlendMode::Normal, opacity: 1.0 }); ui.close(); }
-            if ui.button("⚡ Transition").clicked() { snarl.insert_node(pos, DarkNode::Transition { transition_type: TransitionType::CrossDissolve, progress: 0.5, feather: 0.1 }); ui.close(); }
-            if ui.button("🔊 Audio Reactor").clicked() { snarl.insert_node(pos, DarkNode::AudioReactor { band: crate::node::AudioBand::Bass, multiplier: 1.0, smooth: 0.2 }); ui.close(); }
+            if ui.button("⚡ Transition").clicked() { snarl.insert_node(pos, DarkNode::default_transition(TransitionType::CrossDissolve, 0.5, 0.1)); ui.close(); }
+            if ui.button("🔊 Audio Reactor").clicked() { snarl.insert_node(pos, DarkNode::default_audio_reactor(crate::node::AudioBand::Bass, 1.0, 0.2)); ui.close(); }
             if ui.button("💻 Custom WGSL").clicked() { snarl.insert_node(pos, DarkNode::CustomWgsl { name: "WGSL".into(), code: "@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> { return vec4<f32>(uv.x, uv.y, 0.5, 1.0); }".into() }); ui.close(); }
             if ui.button("📝 Sticky Note").clicked() { snarl.insert_node(pos, DarkNode::StickyNote { title: "Note".into(), content: "Note".into(), color_idx: 0 }); ui.close(); }
             if ui.button("● Reroute").clicked() { snarl.insert_node(pos, DarkNode::Reroute { data_type: NodeDataType::Texture }); ui.close(); }
@@ -410,17 +410,18 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
     fn inputs(&mut self, node: &DarkNode) -> usize {
         match node {
             DarkNode::VideoInput { .. }
-            | DarkNode::TextGenerator { .. }
-            | DarkNode::ShapeGenerator { .. }
             | DarkNode::TimeDriver { .. }
+            | DarkNode::AudioReactor { .. }
             | DarkNode::StickyNote { .. } => 0,
 
-            DarkNode::CropMask { .. }
-            | DarkNode::ColorGrade { .. }
-            | DarkNode::BlurSharpen { .. }
+            DarkNode::TextGenerator { .. }
+            | DarkNode::ShapeGenerator { .. }
+            | DarkNode::CropMask { .. }
             | DarkNode::Keyer { .. }
-            | DarkNode::Output
-            | DarkNode::AudioReactor { .. } => 1,
+            | DarkNode::Output => 1,
+
+            DarkNode::ColorGrade { .. }
+            | DarkNode::BlurSharpen { .. } => 2, // 0: Texture, 1: Mod (Scalar)
 
             DarkNode::DistortLens { .. } => 3, // 0: Texture, 1: Intensity Mod, 2: Center Mod
             DarkNode::Transition { .. } => 3,  // 0: Input A, 1: Input B, 2: Progress Mod
@@ -437,7 +438,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         match node {
             DarkNode::Output | DarkNode::StickyNote { .. } => 0,
             DarkNode::TimeDriver { .. }
-            | DarkNode::AudioReactor { .. } => 1,
+            | DarkNode::AudioReactor { .. } => 2, // 0: Scalar/AudioFloat, 1: Vec2 Out
 
             DarkNode::VideoInput { .. }
             | DarkNode::TextGenerator { .. }
@@ -466,6 +467,9 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
     ) -> PinInfo {
         let node = &snarl[pin.id.node];
         let (name, data_type) = match node {
+            DarkNode::TextGenerator { .. } | DarkNode::ShapeGenerator { .. } => {
+                ("Pos Mod", NodeDataType::Vec2)
+            }
             DarkNode::Transform2D { .. } => match pin.id.input {
                 0 => ("Image In", NodeDataType::Texture),
                 1 => ("Pos Mod", NodeDataType::Vec2),
@@ -473,9 +477,15 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
                 3 => ("Rot Mod", NodeDataType::Scalar),
                 _ => ("Opacity Mod", NodeDataType::Scalar),
             },
+            DarkNode::ColorGrade { .. } => match pin.id.input {
+                0 => ("Image In", NodeDataType::Texture),
+                _ => ("Exp Mod", NodeDataType::Scalar),
+            },
+            DarkNode::BlurSharpen { .. } => match pin.id.input {
+                0 => ("Image In", NodeDataType::Texture),
+                _ => ("Radius Mod", NodeDataType::Scalar),
+            },
             DarkNode::CropMask { .. }
-            | DarkNode::ColorGrade { .. }
-            | DarkNode::BlurSharpen { .. }
             | DarkNode::Keyer { .. }
             | DarkNode::Output => ("Image In", NodeDataType::Texture),
 
@@ -499,7 +509,10 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
 
             DarkNode::AudioReactor { .. } => ("Audio Track", NodeDataType::AudioFloat),
             DarkNode::ActionNode { .. } => ("Trigger In", NodeDataType::ActionFlow),
-            DarkNode::CustomWgsl { .. } => ("Input", NodeDataType::Texture),
+            DarkNode::CustomWgsl { .. } => match pin.id.input {
+                0 => ("Input", NodeDataType::Texture),
+                _ => ("Param Mod", NodeDataType::Scalar),
+            },
             DarkNode::Reroute { data_type } => ("In", *data_type),
             _ => ("In", NodeDataType::Any),
         };
@@ -532,13 +545,20 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
             | DarkNode::Keyer { .. }
             | DarkNode::CustomWgsl { .. } => ("Texture Out", NodeDataType::Texture),
 
-            DarkNode::TimeDriver { .. } => ("Time Value", NodeDataType::Scalar),
-            DarkNode::AudioReactor { .. } => ("Peak Value", NodeDataType::Scalar),
+            DarkNode::TimeDriver { .. } => match pin.id.output {
+                0 => ("Time Value", NodeDataType::Scalar),
+                _ => ("Vec2 Out", NodeDataType::Vec2),
+            },
+            DarkNode::AudioReactor { .. } => match pin.id.output {
+                0 => ("Peak Value", NodeDataType::Scalar),
+                _ => ("Vec2 Out", NodeDataType::Vec2),
+            },
             DarkNode::ActionNode { .. } => ("Flow Out", NodeDataType::ActionFlow),
             DarkNode::Reroute { data_type } => ("Out", *data_type),
             _ => ("Out", NodeDataType::Any),
         };
 
+        ui.add_space(10.0);
         let resp = ui.label(name);
         if resp.hovered() {
             ui.ctx().set_cursor_icon(CursorIcon::PointingHand);

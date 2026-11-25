@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 use crate::panels::node_graph_bridge;
 use crate::panels::node_graph_groups::{self, GroupMenuAction};
 use crate::panels::node_graph_menus;
+use crate::panels::node_graph_presets::{self, PresetUiState};
 use crate::FilmcraftApp;
 
 /// Trạng thái lưu trữ của Node Graph Panel trong RAM.
@@ -45,6 +46,7 @@ pub struct NodeGraphState {
     pub bound_clip_name: String,
     pub last_synced_doc: Option<darkworks_node_graph_core::NodeGraphDoc>,
     pub last_observed_selection: Option<filmcraft_engine::project::ClipId>,
+    pub preset_ui: PresetUiState,
 }
 
 impl NodeGraphState {
@@ -103,6 +105,7 @@ impl Default for NodeGraphState {
             bound_clip_name: String::new(),
             last_synced_doc: None,
             last_observed_selection: None,
+            preset_ui: PresetUiState::default(),
         }
     }
 }
@@ -125,6 +128,14 @@ fn get_or_init_state(ctx: &egui::Context) -> Arc<Mutex<NodeGraphState>> {
         d.get_temp_mut_or_insert_with(id, || Arc::new(Mutex::new(NodeGraphState::default())))
             .clone()
     })
+}
+
+/// Truy cập và chỉnh sửa an toàn `NodeGraphState` từ callback bất đồng bộ (ví dụ `FileDialog`).
+pub fn with_state(ctx: &egui::Context, f: impl FnOnce(&mut NodeGraphState)) {
+    let state_arc = get_or_init_state(ctx);
+    if let Ok(mut state) = state_arc.lock() {
+        f(&mut state);
+    }
 }
 
 /// Xóa các Node đang được chọn hoặc Group đang trỏ chuột (được gọi từ bộ phím tắt toàn cục hoặc phím Delete)
@@ -229,9 +240,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
         node_graph_bridge::render_timeline_actions(app, ui, state);
         ui.separator();
 
-        // Menu Thêm Node & Load Preset
+        // Menu Thêm Node & Thư viện Preset
         node_graph_menus::render_add_node_menu(ui, state);
-        node_graph_menus::render_load_preset_menu(ui, state);
+        node_graph_presets::render_load_preset_menu(app, ui, state);
 
         let can_undo = state.history.can_undo();
         let can_redo = state.history.can_redo();
@@ -254,18 +265,41 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
             state.show_groups_dialog = !state.show_groups_dialog;
         }
 
-        if ui.button("💾 Export Preset").clicked() {
-            let preset = NodeGraphPreset {
-                name: "Darkworks Exported Preset".to_string(),
-                version: "1.0.0".to_string(),
-                description: "Exported from Darkworks Node Graph".to_string(),
-                nodes: state.snarl.node_ids().map(|(_id, node)| node.clone()).collect(),
-                groups: state.groups.clone(),
-            };
-            if let Ok(json) = preset.to_json_string() {
-                ui.ctx().copy_text(json);
-                state.status_message = "Đã copy Preset JSON vào Clipboard!".to_string();
-            }
+        if ui
+            .button("💾 Save Preset")
+            .on_hover_text("Lưu Preset vào Thư viện dùng chung giữa mọi Project hoặc xuất file .preset.json")
+            .clicked()
+        {
+            node_graph_presets::open_save_preset_dialog(state);
+        }
+
+        if ui
+            .button("💾 Export .preset.json")
+            .on_hover_text("Xuất đồ thị (kèm đầy đủ dây nối, tọa độ và Visual Groups) ra file .preset.json")
+            .clicked()
+        {
+            let default_name = state
+                .groups
+                .first()
+                .map(|g| g.title.clone())
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "Darkworks Exported Preset".to_string());
+            node_graph_presets::trigger_export_preset_dialog(
+                app,
+                ui.ctx(),
+                state,
+                &default_name,
+                "Custom",
+                "Exported from Darkworks Node Graph",
+            );
+        }
+
+        if ui
+            .button("📥 Import Preset")
+            .on_hover_text("Nạp file .preset.json từ ổ đĩa vào chế độ Nháp")
+            .clicked()
+        {
+            node_graph_presets::trigger_import_preset_dialog(app, ui.ctx());
         }
 
         if ui.button("⚡ Validate DAG").clicked() {
@@ -612,7 +646,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
         }
     }
 
-    // 3. HỘP THOẠI DIALOG QUẢN LÝ VISUAL GROUPS (Floating Window)
+    // 3. HỘP THOẠI DIALOG LƯU PRESET & QUẢN LÝ VISUAL GROUPS (Floating Windows)
+    node_graph_presets::show_save_preset_dialog(app, state, ui.ctx());
     node_graph_groups::show_groups_dialog(
         state,
         snarl_id,

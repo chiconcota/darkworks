@@ -1,6 +1,6 @@
 # MODULE KIẾN TRÚC: NODE GRAPH & GPU COMPOSITOR (node-graph/architecture.md)
 @crate: `crates/node-graph-core` (L0) + `crates/node-graph` (L5) + `crates/render/src/node_graph.rs` (L2) + `crates/gpu/src/custom_wgsl.rs` (L3)
-@engine: egui_snarl + wgpu + crates/text | @status: 🟡 Hoàn Thành Core DAG + Timeline/Render Bridge (Còn Task 3.12 Kho Preset `.preset.json` Thật)
+@engine: egui_snarl + wgpu + crates/text | @status: 🟡 Hoàn Thành Core DAG + Kho Preset `.preset.json` + Nâng Cấp Nhóm A Atomic Nodes (Đang kiểm thử từng node & chờ Node/Preset Library UI)
 
 ## 1. VAI TRÒ & TRÁCH NHIỆM
 Đây là trái tim đồ họa phân biệt Darkworks với FilmCraft và Premiere truyền thống. Module này thay thế hoàn toàn danh sách tuyến tính `Vec<EffectInstance>` bằng mạng lưới đồ thị có hướng không chu trình (Directed Acyclic Graph - DAG), hỗ trợ các container đóng gói (Black Node), trạm tự động hóa quy trình (Action Node), công cụ tổ chức canvas ComfyUI Style, và khả năng mở rộng vô hạn qua Code Node (Custom WGSL JIT Shader).
@@ -15,19 +15,19 @@
   - Tương thích tín hiệu `NodeDataType::AudioFloat` có thể nối vào `NodeDataType::Scalar` để lái chuyển động procedural theo nhạc.
 
 - **Hệ Sinh Thái 18 Versatile Atomic Nodes Bản Đầy Đủ (Gom Trọn 93 Shaders Cũ):**
-  1. `VideoInput`: Lấy texture khung hình video gốc từ clip tại Playhead (chọn nguồn Track V1, V2 hoặc All Below).
-  2. `TextGenerator`: Sinh chữ động, xuất texture RGBA kèm kênh Alpha trong suốt (`font_size`, `tracking`, `line_spacing`).
-  3. `ShapeGenerator`: Vẽ hình khối chữ nhật bo góc, hình tròn, dải màu Solid Matte làm nền cho banner, lower-third, mask.
-  4. `TimeDriver`: Bộ đếm thời gian, tốc độ cuộn ngang Ticker/Marquee, sóng dao động LFO (Linear, SineLoop, PingPong).
-  5. `ColorGrade`: Chỉnh sáng, độ tương phản, nhiệt độ màu, độ bão hòa, tint, gamma, Color Tint (`tint_color` Color Picker + `tint_amount`), và 2 toggle chuyên dụng `[✓] Invert Colors`, `[✓] Black & White`.
-  6. `BlurSharpen`: Gom 5 shader làm mờ (Gaussian, Box, Directional, Bokeh Bloom, Unsharp Mask) kèm `radius`, `angle_deg`, `highlight_boost`.
-  7. `DistortLens`: Gom 6 shader biến dạng (Vignette, FishEye, Lens Distortion, Ripple Wave, Chromatic Aberration) kèm `intensity`, `radius`, `center`.
+  1. `VideoInput`: Lấy texture khung hình video từ `Auto (Clip)`, `All Below`, hoặc track tường minh `V1`, `V2`, `V3`, `V4` (hỗ trợ cả FX Clip có giới hạn `MAX_VIDEO_INPUT_DEPTH = 4` chống lặp).
+  2. `TextGenerator`: Sinh chữ động có alpha (`font_size`, `font_family` ComboBox từ `filmcraft_text`, `bold`, `italic`, `align`, `position`, `tracking`, `line_spacing`, `stroke_width` + `stroke_color`, và socket `Pos Mod (Vec2)`).
+  3. `ShapeGenerator`: Vẽ hình khối chữ nhật bo góc, hình tròn, Solid Matte kèm `position`, `stroke_width` + `stroke_color`, `feather` (làm mềm viền Mask), và socket `Pos Mod (Vec2)`.
+  4. `TimeDriver`: Bộ đếm thời gian (`Linear`, `SineLoop`, `PingPong`), hỗ trợ `amplitude`, `offset`, `vec2_axis`, xuất cả `Time Value (Scalar)` lẫn `Vec2 Out (Vec2)`.
+  5. `ColorGrade`: Chỉnh sáng/màu cơ bản (`exposure` + socket `Exp Mod`, `contrast`, `saturation`, `temperature`, `tint`, `gamma`, `tint_color`/`tint_amount`), `Invert Colors`, `Black & White`, và bộ Lumetri mở rộng (`highlights`, `shadows`, `whites`, `blacks`, `vibrance`, `faded_film`, `shadow_tint`, `highlight_tint`).
+  6. `BlurSharpen`: Gom 5 thuật toán (`Gaussian`, `Box` thật qua `box_blur`, `Directional`, `BokehBloom`, `UnsharpMask`) kèm `radius` + socket `Radius Mod (Scalar)`, `angle_deg`, `highlight_boost`, `threshold`.
+  7. `DistortLens`: Gom 9 hiệu ứng (`Vignette` kèm `feather`, `FishEye`, `LensDistortion`, `RippleWave`, `ChromaticAberration`, `Mirror`, `Offset`, `Posterize`, `Pixelate`).
   8. `Keyer`: Tách phông xanh Ultra Keyer thời gian thực kèm `key_color` (Color Picker) và `spill_suppress`.
-  9. `Transform2D`: Zoom, Pan, Rotate, Anchor, Opacity, và 2 toggle `[Flip H]`, `[Flip V]`.
+  9. `Transform2D`: Zoom (`Scale X/Y`), Pan, Rotate, Anchor, Opacity, và 2 toggle `[Flip H]`, `[Flip V]`.
   10. `CropMask`: Cắt xén 4 cạnh và làm mềm viền `feather`.
   11. `Blend`: Trộn 2 lớp hình ảnh với đầy đủ 27 chế độ hòa trộn của `filmcraft_render::Blend` (`BlendMode::ALL`, giữ `Add` tương thích ngược) và 3 cổng `Background`, `Foreground`, `Mask`.
-  12. `Transition`: Chuyển cảnh 30 hiệu ứng (CrossDissolve, LinearWipe, Slide, Iris, ZoomPush) kèm `progress` và `feather`.
-  13. `AudioReactor`: Đọc RMS peak từ audio track đẩy sang socket thông số (Scale/Shake/Glow/Wave).
+  12. `Transition`: Chuyển cảnh 8 kiểu (`CrossDissolve`, `LinearWipe`, `Slide`, `Iris`, `ZoomPush`, `DipBlack`, `DipWhite`, `BlurDissolve`) kèm `direction` (`Left`/`Right`/`Up`/`Down`), `progress` và `feather`.
+  13. `AudioReactor`: Đọc RMS theo dải tần từ `Master Mix`, `Linked Audio` (`item.link`), hoặc track `A1..A4`, xuất `Peak Value (Scalar)` & `Vec2 Out (Vec2)` *(lưu ý: đang ghi nhận nghi vấn fail khi test thực tế trên app — chờ RCA phiên sau)*.
   14. `ActionNode`: Trạm tự động hóa quy trình, nút `[ ▶ RUN WORKFLOW ]` gọi lệnh `Session::execute`, hoàn tác `Ctrl + Z`.
   15. `BlackNode`: Đóng gói cụm nodes thành 1 hộp đen, bộc lộ `Exposed Pins`, xuất/nạp `.preset.json`.
   16. `CustomWgsl`: Nhúng khung soạn code WGSL, wgpu JIT-compile < 2ms, tự động parse reflection biến `uniform`.
@@ -56,11 +56,14 @@
   - Bố cục điều khiển dọc gọn (`max_width(195.0)`) trong `crates/node-graph/src/node_controls.rs` tích hợp `ComboBox` cho `Blend`, `ShapeGenerator`, `AudioReactor`, `ActionNode` và Color Picker trực tiếp trên node.
   - Lộ trình mở rộng chi tiết xem tại `visual_group_ux_specs.md`.
 
-- **Tách Crate L0 (`crates/node-graph-core`) & Cầu Nối Compositor (`crates/render` + `crates/gpu`):**
-  - `crates/node-graph-core` (Layer 0, không phụ thuộc `egui`) chứa `NodeGraphDoc`, `DarkNode`, `DagEvaluator`, `WgslParser`.
-  - `crates/project::TrackItem` lưu `pub node_graph: Option<Box<NodeGraphDoc>>`; `crates/engine/src/node_graph.rs` cung cấp các lệnh `nodeGraph.{setOnClip, createOverlayClip, applyScope, clearFromClip, getFromClip}`.
-  - `crates/render/src/node_graph.rs` điều phối `eval_item_graph` tại `Tick` hiện tại và chia nhánh xử lý theo nhóm node vào `crates/render/src/nodes/` (`generators.rs`, `shape.rs`, `text.rs`, `color_blur.rs`, `blur_distort.rs`, `transform_blend.rs`, `signals.rs`).
-  - `crates/gpu/src/custom_wgsl.rs` biên dịch `CustomWgsl` fragment shader an toàn qua `push_error_scope` (cache tối đa 32 pipelines) và nối vào render via `register_wgsl_runner`.
+- **Phân Hệ Lưu / Xuất / Nhập `.preset.json` (`crates/node-graph-core/src/preset.rs` & `crates/ui-egui/src/panels/node_graph_presets.rs`):**
+  - `NodeGraphPresetDoc`: Lưu metadata (`name`, `category`, `version`, `description`) + trọn vẹn `NodeGraphDoc` (`nodes`, `pos`, `custom_title`, `wires`, `groups`), giữ tương thích ngược preset cũ.
+  - Thư mục User Presets dùng chung mọi project tại `<data_dir>/Node Presets/`.
+  - Hỗ trợ `chain_node_graphs` cho 2 chế độ áp Preset: **Thay thế (Replace)** hoặc **Nối tiếp trước `Final Output` (Chain)**.
+- **Bố Cục UI & Render Nodes (`node_controls.rs`, `crates/render/src/`):**
+  - `render_node_body` dùng `ui.vertical` (`set_max_width(210.0)`) khắc phục triệt để xung đột `Layout::left_to_right` của `egui_snarl`.
+  - FX Clip (`AdjustmentLayer`) trong `crates/render/src/lib.rs` phân biệt đồ thị có `VideoInput` (`canvas.set(adj)`) và đồ thị overlay không có `VideoInput` (`blend::composite` đè lên `below`).
+  - `crates/render/src/nodes/signals.rs` xử lý `resolve_video_input`, `compute_audio_rms_map` và các hàm `modulated_*`.
 
 - **Topological DAG Evaluator & Cycle Proof:**
   - Thuật toán Kahn's Algorithm sắp xếp thứ tự thực thi và phát hiện vòng lặp `DagError::CycleDetected`.

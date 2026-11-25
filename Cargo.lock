@@ -1677,6 +1677,7 @@ dependencies = [
  "darkworks-node-graph-core",
  "egui",
  "egui-snarl",
+ "filmcraft-text",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

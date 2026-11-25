@@ -172,6 +172,18 @@ impl DagEvaluator {
         timeline_time_sec: f64,
         audio_rms_peak: f32,
     ) -> EvaluationContext {
+        let empty = HashMap::new();
+        Self::evaluate_signals_with_audio(plan, timeline_time_sec, audio_rms_peak, &empty)
+    }
+
+    /// Tính toán luồng tín hiệu số kèm bảng RMS riêng cho từng `AudioReactor` (`node_id -> rms`).
+    #[must_use]
+    pub fn evaluate_signals_with_audio(
+        plan: &DagDocPlan,
+        timeline_time_sec: f64,
+        audio_rms_peak: f32,
+        per_node_audio: &HashMap<usize, f32>,
+    ) -> EvaluationContext {
         let mut ctx = EvaluationContext {
             timeline_time_sec,
             audio_rms_peak,
@@ -183,9 +195,15 @@ impl DagEvaluator {
         for step in &plan.steps {
             let idx = step.node_id;
             match &step.node {
-                DarkNode::TimeDriver { speed, mode } => {
+                DarkNode::TimeDriver {
+                    speed,
+                    mode,
+                    amplitude,
+                    offset,
+                    vec2_axis,
+                } => {
                     let raw_time = (timeline_time_sec as f32) * speed;
-                    let val = match mode {
+                    let base = match mode {
                         TimeMode::Linear => raw_time,
                         TimeMode::SineLoop => (raw_time.sin() + 1.0) * 0.5,
                         TimeMode::PingPong => {
@@ -193,11 +211,21 @@ impl DagEvaluator {
                             if rem < 1.0 { rem } else { 2.0 - rem }
                         }
                     };
-                    ctx.scalar_outputs.insert(idx, val);
+                    let scalar = base * amplitude + offset;
+                    ctx.scalar_outputs.insert(idx, scalar);
+                    ctx.vec2_outputs
+                        .insert(idx, [scalar * vec2_axis[0], scalar * vec2_axis[1]]);
                 }
-                DarkNode::AudioReactor { multiplier, smooth: _, band: _ } => {
-                    let val = (audio_rms_peak * multiplier).clamp(0.0, 10.0);
+                DarkNode::AudioReactor {
+                    multiplier,
+                    vec2_axis,
+                    ..
+                } => {
+                    let rms = per_node_audio.get(&idx).copied().unwrap_or(audio_rms_peak);
+                    let val = (rms * multiplier).clamp(0.0, 10.0);
                     ctx.scalar_outputs.insert(idx, val);
+                    ctx.vec2_outputs
+                        .insert(idx, [val * vec2_axis[0], val * vec2_axis[1]]);
                 }
                 DarkNode::ShapeGenerator { color, size, .. } => {
                     ctx.color_outputs.insert(idx, *color);

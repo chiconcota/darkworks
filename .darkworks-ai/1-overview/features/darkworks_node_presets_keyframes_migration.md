@@ -21,13 +21,18 @@ flowchart LR
 ---
 
 ## 📦 DW-06: KHO PRESET NODE GRAPH (`.preset.json` THẬT) — PHASE 3.12
-@status: ⚪ Chờ triển khai | @target_crates: `node-graph-core`, `node-graph`, `ui-egui`
+@status: 🟡 Đã xong Export/Import/User Library & Replace/Chain — Đang mở rộng sang Node & Preset Library UI
+@target_crates: `node-graph-core`, `node-graph`, `ui-egui`
 
 ### Sub-features
-- **Export File `.preset.json` Thật:** Nút `💾 Export Preset` mở hộp thoại `Save As`, lưu toàn bộ `NodeGraphDoc` (`nodes`, `pos`, `custom_title`, `wires`, `groups`) xuống ổ đĩa.
+- **Export File `.preset.json` Thật:** Nút `💾 Export .preset.json` mở hộp thoại `Save As`, lưu toàn bộ `NodeGraphDoc` (`nodes`, `pos`, `custom_title`, `wires`, `groups`) xuống ổ đĩa.
 - **Import File `.preset.json`:** Nạp lại file bất kỳ từ ổ đĩa vào chế độ Nháp (`📝 Nháp`), giữ nguyên 100% dây nối, vị trí node và tên tùy chỉnh.
-- **Thư Viện User Presets Lưu Sẵn:** Tự quét thư mục preset người dùng + kho preset dựng sẵn, hiển thị thành danh sách chọn/kéo-thả 1-click.
+- **Thư Viện User Presets Lưu Sẵn (Dùng chung mọi Project):** Lưu vào `<data_dir>/Node Presets/`, tự quét và hiển thị thành danh sách chọn 1-click.
 - **Replace vs Chain (Nối Tiếp):** Khi áp Preset thứ 2 lên một Clip đã có Node Graph, người dùng chọn **Thay thế** hoặc **Nối tiếp** vào trước `Final Output`.
+- **Nâng cấp UI/UX Kho Preset (Kế hoạch tiếp theo cho DW-06b / Phase 4):**
+  - Thay thế menu thả xuống nhỏ `📂 Load Preset` bằng **Node & Preset Library Browser** (tái sử dụng cấu trúc Search + Category Tree + Thumbnail Grid của `PanelKind::Effects` hoặc Sidebar trái trong Node Graph + Quick Search `Tab` trên Canvas).
+  - Render thumbnail xem trước tự động cho mọi Preset (dùng `lumetri_presets::preview_image` chạy qua bộ thực thi Node Graph + cache ảnh nhỏ).
+  - Chuyển đổi các `lumetri_presets` và hiệu ứng lẻ phổ biến thành **Micro-Presets `.preset.json`**, cho phép kéo thả thẳng lên Clip Timeline (tự gắn / Chain) mà không bắt buộc phải mở tab Node Graph.
 
 ### Kịch bản tự test (User POV)
 - [ ] **Test 6.1 — Export & Clear & Import giữ nguyên dây nối:**

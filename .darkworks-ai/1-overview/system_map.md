@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.12) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (27 Blend modes + ComboBox + Color Picker), `crates/render/src/nodes/` + `CustomWgsl` GPU, Timeline Bridge (`Apply to Clip` / `Add as FX Clip` / `New Graph (Nháp)`). | Triển khai Save Preset & Custom Preset `.preset.json` thật (Task 3.12 / `DW-06`). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (đã nâng cấp Nhóm A: Lumetri `ColorGrade`, `BlurSharpen`, `DistortLens`, `Shape`/`Text`+Font ComboBox, `Transition`, `VideoInput` V1/V2, `AudioReactor` A1/A2), Kho Preset `.preset.json` thật + Replace/Chain. | Điều tra lỗi `Audio Reactor` + kiểm tra các node còn lại + UI **Node & Preset Library Browser** (`Task 3.13`). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -123,6 +123,12 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-25 (Ca 2 — Kho Preset `.preset.json` Thật, Nâng Cấp Nhóm A Atomic Nodes & Sửa Lỗi UI/Track Input):**
+  - Triển khai `NodeGraphPresetDoc` & `chain_node_graphs` (`crates/node-graph-core/src/preset.rs`), hộp thoại `💾 Save Preset` (lưu vào `<data_dir>/Node Presets/` dùng chung mọi project), `💾 Export .preset.json`, `📥 Import Preset` (chế độ Nháp) và chế độ áp **Thay thế / Nối tiếp (Chain)** tại `crates/ui-egui/src/panels/node_graph_presets.rs`.
+  - Nâng cấp toàn bộ Nhóm A Atomic Nodes: `ColorGrade` (bộ Lumetri tonal/split-tone + `Exp Mod`), `BlurSharpen` (Box thật, `threshold`, `Radius Mod`), `DistortLens` (`Mirror`, `Offset`, `Posterize`, `Pixelate`, `feather`), `ShapeGenerator` (`position`, `stroke`, `feather`, `Pos Mod`), `TextGenerator` (`Font` ComboBox từ `filmcraft_text`, `Bold/Italic`, `Align`, `position`, `stroke`, `Pos Mod`), `Transition` (`direction`, `ZoomPush` thật, `DipBlack/White`, `BlurDissolve`), `TimeDriver`/`AudioReactor` (`Vec2 Out`).
+  - Sửa `VideoInput` chọn được `Auto`/`All Below`/`V1..V4` (kể cả FX Clip, chống lặp), sửa FX Clip overlay không xóa video V1 bên dưới (`crates/render/src/lib.rs`), sửa `Transform2D` `Scale X/Y`, sửa bố cục `ui.vertical` chống đè chữ trên `TextGenerator` & khoảng đệm nhãn pin trái/phải.
+  - Ghi nhận báo lỗi từ Người Dùng cuối phiên: **`Audio Reactor` có vẻ fail khi test thực tế** — bàn giao kiểm tra RCA ở đầu phiên sau.
 
 - **2026-11-25 (Tách Lõi L0, Nối Cầu Node Graph ⇄ Timeline/Render, Sửa 27 Blend Modes, Chống Ghi Đè Clip Khi Tạo FX Mới & Hoạch Định Preset/Keyframe):**
   - Tách crate thuần dữ liệu `crates/node-graph-core` (Layer 0, không `egui`) và nối cầu `NodeGraphDoc` xuống `TrackItem`, `crates/engine` (`nodeGraph.*`), `crates/render` (`node_graph.rs` + phân tách module `crates/render/src/nodes/`) và `crates/gpu/src/custom_wgsl.rs`.

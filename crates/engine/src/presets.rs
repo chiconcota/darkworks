@@ -240,6 +240,11 @@ impl PresetLibrary {
         filmcraft_format::atomic_write(&d.join(LIBRARY_INDEX), &bytes).map_err(|e| e.to_string())
     }
 
+    /// Thư mục dữ liệu gốc chứa các thư viện người dùng (`<data dir>`).
+    pub fn data_dir(&self) -> Option<&Path> {
+        self.dir.as_deref()
+    }
+
     /// The preset library folder, creating it so users can drop files into it.
     pub fn library_dir(&self) -> Option<PathBuf> {
         let d = self.dir.as_ref()?.join(LIBRARY_DIR);

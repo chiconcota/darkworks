@@ -12,6 +12,25 @@ pub enum ShapeType {
     SolidMatte,
 }
 
+/// Căn lề văn bản cho `TextGenerator`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum TextAlign {
+    Left,
+    #[default]
+    Center,
+    Right,
+}
+
+/// Hướng chuyển cảnh cho `Transition`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum TransitionDirection {
+    #[default]
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
 /// Chế độ đếm thời gian của `TimeDriver`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TimeMode {
@@ -153,7 +172,7 @@ pub enum BlurType {
     UnsharpMask,
 }
 
-/// 5 Thuật toán biến dạng thấu kính của `DistortLens` (Gom 6 Shader WGSL)
+/// Thuật toán biến dạng & stylize của `DistortLens`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DistortType {
     Vignette,
@@ -161,9 +180,13 @@ pub enum DistortType {
     LensDistortion,
     RippleWave,
     ChromaticAberration,
+    Mirror,
+    Offset,
+    Posterize,
+    Pixelate,
 }
 
-/// 5 Thuật toán chuyển cảnh của `Transition` (Gom 30 Shader WGSL)
+/// Thuật toán chuyển cảnh của `Transition`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TransitionType {
     CrossDissolve,
@@ -171,10 +194,34 @@ pub enum TransitionType {
     Slide,
     Iris,
     ZoomPush,
+    DipBlack,
+    DipWhite,
+    BlurDissolve,
 }
 
 fn default_tint_color() -> [f32; 4] {
     [1.0, 1.0, 1.0, 1.0]
+}
+fn default_neutral_split_tint() -> [f32; 3] {
+    [0.5, 0.5, 0.5]
+}
+fn default_one() -> f32 {
+    1.0
+}
+fn default_blur_threshold() -> f32 {
+    0.5
+}
+fn default_distort_feather() -> f32 {
+    0.4
+}
+fn default_time_vec2_axis() -> [f32; 2] {
+    [60.0, 0.0]
+}
+fn default_stroke_color() -> [f32; 4] {
+    [0.0, 0.0, 0.0, 1.0]
+}
+fn default_audio_track() -> String {
+    "Master".to_string()
 }
 
 /// Enum đại diện cho mọi Node trên Canvas Darkworks (Hệ sinh thái 18 Atomic Nodes + Final Output).
@@ -190,16 +237,44 @@ pub enum DarkNode {
         color: [f32; 4],
         tracking: f32,
         line_spacing: f32,
+        #[serde(default)]
+        position: [f32; 2],
+        #[serde(default)]
+        align: TextAlign,
+        #[serde(default)]
+        font_family: String,
+        #[serde(default)]
+        bold: bool,
+        #[serde(default)]
+        italic: bool,
+        #[serde(default = "default_stroke_color")]
+        stroke_color: [f32; 4],
+        #[serde(default)]
+        stroke_width: f32,
     },
     ShapeGenerator {
         shape_type: ShapeType,
         size: [f32; 2],
         corner_radius: f32,
         color: [f32; 4],
+        #[serde(default)]
+        position: [f32; 2],
+        #[serde(default)]
+        stroke_width: f32,
+        #[serde(default = "default_tint_color")]
+        stroke_color: [f32; 4],
+        #[serde(default)]
+        feather: f32,
     },
     TimeDriver {
         speed: f32,
         mode: TimeMode,
+        #[serde(default = "default_one")]
+        amplitude: f32,
+        #[serde(default)]
+        offset: f32,
+        #[serde(default = "default_time_vec2_axis")]
+        vec2_axis: [f32; 2],
     },
 
     // === NHÓM 2: CHỈNH MÀU & QUANG HỌC (COLOR & OPTICS - 4 NODES) ===
@@ -216,18 +291,38 @@ pub enum DarkNode {
         tint_color: [f32; 4],
         #[serde(default)]
         tint_amount: f32,
+        #[serde(default)]
+        highlights: f32,
+        #[serde(default)]
+        shadows: f32,
+        #[serde(default)]
+        whites: f32,
+        #[serde(default)]
+        blacks: f32,
+        #[serde(default)]
+        vibrance: f32,
+        #[serde(default)]
+        faded_film: f32,
+        #[serde(default = "default_neutral_split_tint")]
+        shadow_tint: [f32; 3],
+        #[serde(default = "default_neutral_split_tint")]
+        highlight_tint: [f32; 3],
     },
     BlurSharpen {
         blur_type: BlurType,
         radius: f32,
         angle_deg: f32,
         highlight_boost: f32,
+        #[serde(default = "default_blur_threshold")]
+        threshold: f32,
     },
     DistortLens {
         distort_type: DistortType,
         intensity: f32,
         radius: f32,
         center: [f32; 2],
+        #[serde(default = "default_distort_feather")]
+        feather: f32,
     },
     Keyer {
         key_color: [f32; 3],
@@ -263,6 +358,8 @@ pub enum DarkNode {
         transition_type: TransitionType,
         progress: f32,
         feather: f32,
+        #[serde(default)]
+        direction: TransitionDirection,
     },
 
     // === NHÓM 5: TÍN HIỆU & TỰ ĐỘNG HÓA (SIGNALS & AUTOMATION - 2 NODES) ===
@@ -270,6 +367,10 @@ pub enum DarkNode {
         band: AudioBand,
         multiplier: f32,
         smooth: f32,
+        #[serde(default)]
+        vec2_axis: [f32; 2],
+        #[serde(default = "default_audio_track")]
+        track_name: String,
     },
     ActionNode {
         name: String,
@@ -301,6 +402,124 @@ pub enum DarkNode {
 }
 
 impl DarkNode {
+    /// Khởi tạo `TextGenerator` mặc định.
+    #[must_use]
+    pub fn default_text(text: impl Into<String>) -> Self {
+        Self::TextGenerator {
+            text: text.into(),
+            font_size: 36.0,
+            color: [1.0, 1.0, 1.0, 1.0],
+            tracking: 0.0,
+            line_spacing: 1.1,
+            position: [0.0, 0.0],
+            align: TextAlign::Center,
+            font_family: String::new(),
+            bold: false,
+            italic: false,
+            stroke_color: [0.0, 0.0, 0.0, 1.0],
+            stroke_width: 0.0,
+        }
+    }
+
+    /// Khởi tạo `ShapeGenerator` mặc định.
+    #[must_use]
+    pub fn default_shape(shape_type: ShapeType, size: [f32; 2], corner_radius: f32, color: [f32; 4]) -> Self {
+        Self::ShapeGenerator {
+            shape_type,
+            size,
+            corner_radius,
+            color,
+            position: [0.0, 0.0],
+            stroke_width: 0.0,
+            stroke_color: [1.0, 1.0, 1.0, 1.0],
+            feather: 0.0,
+        }
+    }
+
+    /// Khởi tạo `TimeDriver` mặc định.
+    #[must_use]
+    pub fn default_time_driver(speed: f32, mode: TimeMode) -> Self {
+        Self::TimeDriver {
+            speed,
+            mode,
+            amplitude: 1.0,
+            offset: 0.0,
+            vec2_axis: [60.0, 0.0],
+        }
+    }
+
+    /// Khởi tạo `ColorGrade` mặc định (tất cả thông số trung tính).
+    #[must_use]
+    pub fn default_color_grade() -> Self {
+        Self::ColorGrade {
+            exposure: 0.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            temperature: 0.0,
+            tint: 0.0,
+            gamma: 1.0,
+            invert: false,
+            black_and_white: false,
+            tint_color: [1.0, 1.0, 1.0, 1.0],
+            tint_amount: 0.0,
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
+            vibrance: 0.0,
+            faded_film: 0.0,
+            shadow_tint: [0.5, 0.5, 0.5],
+            highlight_tint: [0.5, 0.5, 0.5],
+        }
+    }
+
+    /// Khởi tạo `BlurSharpen` mặc định.
+    #[must_use]
+    pub fn default_blur(blur_type: BlurType, radius: f32, angle_deg: f32, highlight_boost: f32) -> Self {
+        Self::BlurSharpen {
+            blur_type,
+            radius,
+            angle_deg,
+            highlight_boost,
+            threshold: 0.5,
+        }
+    }
+
+    /// Khởi tạo `DistortLens` mặc định.
+    #[must_use]
+    pub fn default_distort(distort_type: DistortType, intensity: f32, radius: f32, center: [f32; 2]) -> Self {
+        Self::DistortLens {
+            distort_type,
+            intensity,
+            radius,
+            center,
+            feather: 0.4,
+        }
+    }
+
+    /// Khởi tạo `Transition` mặc định.
+    #[must_use]
+    pub fn default_transition(transition_type: TransitionType, progress: f32, feather: f32) -> Self {
+        Self::Transition {
+            transition_type,
+            progress,
+            feather,
+            direction: TransitionDirection::Left,
+        }
+    }
+
+    /// Khởi tạo `AudioReactor` mặc định.
+    #[must_use]
+    pub fn default_audio_reactor(band: AudioBand, multiplier: f32, smooth: f32) -> Self {
+        Self::AudioReactor {
+            band,
+            multiplier,
+            smooth,
+            vec2_axis: [0.0, 0.0],
+            track_name: default_audio_track(),
+        }
+    }
+
     /// Tiêu đề hiển thị trên thanh Header của Node Card.
     #[must_use]
     pub fn title(&self) -> String {
@@ -328,7 +547,9 @@ impl DarkNode {
             Self::Blend { mode, .. } => format!("🎭 Blend ({mode:?})"),
             Self::Transition { transition_type, .. } => format!("⚡ Transition ({transition_type:?})"),
 
-            Self::AudioReactor { band, .. } => format!("🔊 Audio Reactor ({band:?})"),
+            Self::AudioReactor { band, track_name, .. } => {
+                format!("🔊 Audio Reactor ({track_name} · {band:?})")
+            }
             Self::ActionNode { name, .. } => format!("⚡ Action: {name}"),
 
             Self::BlackNode { name, .. } => format!("⬛ Black Box: {name}"),
@@ -343,17 +564,18 @@ impl DarkNode {
     #[must_use]
     pub fn input_data_type(&self, pin: usize) -> NodeDataType {
         match self {
+            Self::TextGenerator { .. } | Self::ShapeGenerator { .. } => NodeDataType::Vec2,
             Self::Transform2D { .. } => match pin {
                 0 => NodeDataType::Texture,
                 1 => NodeDataType::Vec2,
                 2..=4 => NodeDataType::Scalar,
                 _ => NodeDataType::Any,
             },
-            Self::CropMask { .. }
-            | Self::ColorGrade { .. }
-            | Self::BlurSharpen { .. }
-            | Self::Keyer { .. }
-            | Self::Output => NodeDataType::Texture,
+            Self::ColorGrade { .. } | Self::BlurSharpen { .. } => match pin {
+                0 => NodeDataType::Texture,
+                _ => NodeDataType::Scalar,
+            },
+            Self::CropMask { .. } | Self::Keyer { .. } | Self::Output => NodeDataType::Texture,
 
             Self::DistortLens { .. } => match pin {
                 0 => NodeDataType::Texture,
@@ -384,10 +606,16 @@ impl DarkNode {
 
     /// Kiểu dữ liệu xuất ra của cổng Output tại vị trí pin.
     #[must_use]
-    pub fn output_data_type(&self, _pin: usize) -> NodeDataType {
+    pub fn output_data_type(&self, pin: usize) -> NodeDataType {
         match self {
-            Self::TimeDriver { .. } => NodeDataType::Scalar,
-            Self::AudioReactor { .. } => NodeDataType::AudioFloat,
+            Self::TimeDriver { .. } => match pin {
+                0 => NodeDataType::Scalar,
+                _ => NodeDataType::Vec2,
+            },
+            Self::AudioReactor { .. } => match pin {
+                0 => NodeDataType::AudioFloat,
+                _ => NodeDataType::Vec2,
+            },
             Self::ActionNode { .. } => NodeDataType::ActionFlow,
             Self::Reroute { data_type } => *data_type,
             Self::Output | Self::StickyNote { .. } => NodeDataType::Any,

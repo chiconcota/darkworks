@@ -3,11 +3,17 @@
 pub(crate) mod blur_distort;
 pub(crate) mod color;
 pub(crate) mod shape;
+pub(crate) mod signals;
 pub(crate) mod text;
 pub(crate) mod transform_blend;
 
 pub(crate) use blur_distort::{apply_blur_sharpen, apply_distort};
 pub(crate) use color::{apply_color_grade, apply_keyer};
 pub(crate) use shape::render_shape;
+pub(crate) use signals::{
+    compute_audio_rms_map, input_texture, modulated_scalar, modulated_scalar_add,
+    modulated_scalar_add_raw, modulated_scalar_mul, modulated_scalar_override, modulated_vec2,
+    modulated_vec2_add, resolve_video_input,
+};
 pub(crate) use text::render_text;
 pub(crate) use transform_blend::{apply_mask_alpha, apply_transform, apply_transition, map_blend};

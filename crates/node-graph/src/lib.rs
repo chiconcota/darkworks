@@ -19,14 +19,17 @@ pub mod viewer;
 
 pub use compound::{BlackNodeSubgraph, ExposedPin};
 pub use custom_shader::{WgslError, WgslParser, WgslUniform};
-pub use darkworks_node_graph_core::{NodeEntry, NodeGraphDoc, NodeWire, VisualGroupDoc};
+pub use darkworks_node_graph_core::{
+    NodeEntry, NodeGraphDoc, NodeGraphPresetDoc, NodeWire, PresetDocError, VisualGroupDoc,
+    chain_node_graphs, ensure_preset_extension, sanitize_preset_filename,
+};
 pub use doc::{doc_from_snarl, snarl_from_doc};
 pub use evaluator::{DagError, DagEvaluator, DagExecutionPlan, DagStep, EvaluationContext};
 pub use group::VisualGroup;
 pub use history::{GraphHistory, GraphSnapshot};
 pub use node::{
-    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TimeMode,
-    TransitionType,
+    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TextAlign,
+    TimeMode, TransitionDirection, TransitionType,
 };
 pub use preset::{BuiltinPresetKind, NodeGraphPreset, PresetError};
 pub use types::{NodeDataType, pin_color32};

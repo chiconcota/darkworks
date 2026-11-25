@@ -14,12 +14,12 @@ fn test_node_graph_creation_and_connections() {
     // 1. Tạo ShapeGenerator (Nền xanh)
     let shape_id = snarl.insert_node(
         Pos2::new(50.0, 50.0),
-        DarkNode::ShapeGenerator {
-            shape_type: ShapeType::RoundedRectangle,
-            size: [1920.0, 80.0],
-            corner_radius: 8.0,
-            color: [0.0, 0.9, 0.4, 1.0], // Green
-        },
+        DarkNode::default_shape(
+            ShapeType::RoundedRectangle,
+            [1920.0, 80.0],
+            8.0,
+            [0.0, 0.9, 0.4, 1.0], // Green
+        ),
     );
 
     // 2. Tạo TextGenerator (Chữ đen)
@@ -31,6 +31,13 @@ fn test_node_graph_creation_and_connections() {
             color: [0.0, 0.0, 0.0, 1.0], // Black
             tracking: 0.5,
             line_spacing: 1.1,
+            position: [0.0, 0.0],
+            align: Default::default(),
+            font_family: String::new(),
+            bold: false,
+            italic: false,
+            stroke_color: [0.0, 0.0, 0.0, 1.0],
+            stroke_width: 0.0,
         },
     );
 
@@ -83,23 +90,14 @@ fn test_node_data_type_compatibility() {
 #[test]
 fn test_preset_serialization_and_deserialization() {
     let nodes = vec![
-        DarkNode::ShapeGenerator {
-            shape_type: ShapeType::Rectangle,
-            size: [800.0, 60.0],
-            corner_radius: 0.0,
-            color: [0.0, 1.0, 0.0, 1.0],
-        },
-        DarkNode::TextGenerator {
-            text: "Breaking News".to_string(),
-            font_size: 32.0,
-            color: [0.0, 0.0, 0.0, 1.0],
-            tracking: 0.0,
-            line_spacing: 1.0,
-        },
-        DarkNode::TimeDriver {
-            speed: 5.0,
-            mode: TimeMode::Linear,
-        },
+        DarkNode::default_shape(
+            ShapeType::Rectangle,
+            [800.0, 60.0],
+            0.0,
+            [0.0, 1.0, 0.0, 1.0],
+        ),
+        DarkNode::default_text("Breaking News"),
+        DarkNode::default_time_driver(5.0, TimeMode::Linear),
     ];
 
     let group = VisualGroup::new(
@@ -179,20 +177,13 @@ fn test_dag_evaluator_topological_sort_and_signals() {
     // 1. TimeDriver (Generator)
     let time_id = snarl.insert_node(
         Pos2::new(0.0, 0.0),
-        DarkNode::TimeDriver {
-            speed: 2.0,
-            mode: TimeMode::Linear,
-        },
+        DarkNode::default_time_driver(2.0, TimeMode::Linear),
     );
 
     // 2. AudioReactor (Generator)
     let audio_id = snarl.insert_node(
         Pos2::new(0.0, 100.0),
-        DarkNode::AudioReactor {
-            band: AudioBand::Bass,
-            multiplier: 1.5,
-            smooth: 0.1,
-        },
+        DarkNode::default_audio_reactor(AudioBand::Bass, 1.5, 0.1),
     );
 
     // 3. Transform2D
@@ -348,20 +339,9 @@ fn test_18_atomic_nodes_creation_and_sockets() {
     // Kiểm tra toàn bộ 18 Atomic Nodes + Output
     let nodes = vec![
         DarkNode::VideoInput { track_name: "V1".to_string() },
-        DarkNode::TextGenerator {
-            text: "Hello".to_string(),
-            font_size: 24.0,
-            color: [1.0, 1.0, 1.0, 1.0],
-            tracking: 0.0,
-            line_spacing: 1.0,
-        },
-        DarkNode::ShapeGenerator {
-            shape_type: ShapeType::Circle,
-            size: [100.0, 100.0],
-            corner_radius: 0.0,
-            color: [1.0, 0.0, 0.0, 1.0],
-        },
-        DarkNode::TimeDriver { speed: 1.0, mode: TimeMode::Linear },
+        DarkNode::default_text("Hello"),
+        DarkNode::default_shape(ShapeType::Circle, [100.0, 100.0], 0.0, [1.0, 0.0, 0.0, 1.0]),
+        DarkNode::default_time_driver(1.0, TimeMode::Linear),
         DarkNode::ColorGrade {
             exposure: 0.5,
             contrast: 1.2,
@@ -373,19 +353,17 @@ fn test_18_atomic_nodes_creation_and_sockets() {
             black_and_white: false,
             tint_color: [1.0, 1.0, 1.0, 1.0],
             tint_amount: 0.0,
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
+            vibrance: 0.0,
+            faded_film: 0.0,
+            shadow_tint: [0.5, 0.5, 0.5],
+            highlight_tint: [0.5, 0.5, 0.5],
         },
-        DarkNode::BlurSharpen {
-            blur_type: BlurType::BokehBloom,
-            radius: 15.0,
-            angle_deg: 0.0,
-            highlight_boost: 1.2,
-        },
-        DarkNode::DistortLens {
-            distort_type: DistortType::RippleWave,
-            intensity: 0.8,
-            radius: 1.0,
-            center: [0.0, 0.0],
-        },
+        DarkNode::default_blur(BlurType::BokehBloom, 15.0, 0.0, 1.2),
+        DarkNode::default_distort(DistortType::RippleWave, 0.8, 1.0, [0.0, 0.0]),
         DarkNode::Keyer {
             key_color: [0.0, 1.0, 0.0],
             similarity: 0.4,
@@ -409,12 +387,8 @@ fn test_18_atomic_nodes_creation_and_sockets() {
             feather: 0.05,
         },
         DarkNode::Blend { mode: BlendMode::Difference, opacity: 1.0 },
-        DarkNode::Transition {
-            transition_type: TransitionType::CrossDissolve,
-            progress: 0.5,
-            feather: 0.1,
-        },
-        DarkNode::AudioReactor { band: AudioBand::MasterPeak, multiplier: 2.0, smooth: 0.1 },
+        DarkNode::default_transition(TransitionType::CrossDissolve, 0.5, 0.1),
+        DarkNode::default_audio_reactor(AudioBand::MasterPeak, 2.0, 0.1),
         DarkNode::ActionNode { name: "Test".to_string(), scope: ActionScope::AllTracks, is_running: false },
         DarkNode::BlackNode { name: "Sub".to_string(), subgraph_id: "s1".to_string(), exposed_pins: vec![] },
         DarkNode::CustomWgsl { name: "Wgsl".to_string(), code: "".to_string() },
@@ -456,31 +430,31 @@ fn test_all_5_builtin_presets_validation() {
 
 #[test]
 fn test_color_grade_invert_title_and_transform_flips() {
-    let invert_node = DarkNode::ColorGrade {
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
-        temperature: 0.0,
-        tint: 0.0,
-        gamma: 1.0,
-        invert: true,
-        black_and_white: false,
-        tint_color: [1.0, 1.0, 1.0, 1.0],
-        tint_amount: 0.0,
+    let invert_node = match DarkNode::default_color_grade() {
+        DarkNode::ColorGrade {
+            exposure, contrast, saturation, temperature, tint, gamma, black_and_white,
+            tint_color, tint_amount, highlights, shadows, whites, blacks, vibrance,
+            faded_film, shadow_tint, highlight_tint, ..
+        } => DarkNode::ColorGrade {
+            exposure, contrast, saturation, temperature, tint, gamma, invert: true,
+            black_and_white, tint_color, tint_amount, highlights, shadows, whites, blacks,
+            vibrance, faded_film, shadow_tint, highlight_tint,
+        },
+        other => other,
     };
     assert_eq!(invert_node.title(), "🎨 Color Grade (Invert)");
 
-    let bw_node = DarkNode::ColorGrade {
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
-        temperature: 0.0,
-        tint: 0.0,
-        gamma: 1.0,
-        invert: false,
-        black_and_white: true,
-        tint_color: [1.0, 1.0, 1.0, 1.0],
-        tint_amount: 0.0,
+    let bw_node = match DarkNode::default_color_grade() {
+        DarkNode::ColorGrade {
+            exposure, contrast, saturation, temperature, tint, gamma, invert,
+            tint_color, tint_amount, highlights, shadows, whites, blacks, vibrance,
+            faded_film, shadow_tint, highlight_tint, ..
+        } => DarkNode::ColorGrade {
+            exposure, contrast, saturation, temperature, tint, gamma, invert,
+            black_and_white: true, tint_color, tint_amount, highlights, shadows, whites, blacks,
+            vibrance, faded_film, shadow_tint, highlight_tint,
+        },
+        other => other,
     };
     assert_eq!(bw_node.title(), "🎨 Color Grade (B&W)");
 

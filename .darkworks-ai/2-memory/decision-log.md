@@ -353,3 +353,10 @@
   1. **Phase 3 (Task 3.8 / 3.12):** Nâng cấp Export/Import file `.preset.json` thật theo `NodeGraphDoc` (đầy đủ `nodes`, `pos`, `wires`, `groups`) + Thư mục User Presets dùng 1-click (hỗ trợ Replace/Chain).
   2. **Phase 4 (Task 4.7):** Xong Keyframe Node Graph + nối Transform Handles trên Program Monitor vào `Transform2D` + đóng gói các Video/Color Presets ➔ **Ẩn** `Effect Controls` và `Video Effects` cũ khỏi UI mặc định.
   3. **Phase 5 (Task 5.5):** Bổ sung Audio DSP Nodes & Edit-Point Transition Bridge trên Timeline ➔ **Xóa sạch** `PanelKind::Effects` và `PanelKind::EffectControls` cũ khỏi giao diện Darkworks.
+
+### 39. Kiến Trúc Node & Preset Library (Search/Filter/Thumbnail Preview & Micro-Presets) (2026-11-25)
+- **Bối cảnh:** Menu thả xuống `📂 Load Preset` không đủ khả năng tìm kiếm, lọc nhóm, xem trước và kéo-thả khi thay thế toàn bộ `Effects` + `Effect Controls` cũ (số lượng preset có thể lên 50–200+).
+- **Quyết định kiến trúc đã duyệt:**
+  1. **Node & Preset Library Browser:** Nâng cấp UI chọn Preset thành bảng thư viện có tìm kiếm real-time, lọc Category/Favorites, Quick Search `Tab` trên Canvas, và kéo thả trực tiếp vào Node Graph hoặc thẳng lên Clip Timeline.
+  2. **Thumbnail Preview thống nhất:** Tái sử dụng ảnh mẫu `lumetri_presets::preview_image` chạy qua bộ thực thi Node Graph (cache ảnh nhỏ) để hiển thị thumbnail trực quan cho cả Color Presets cũ lẫn Custom User Presets.
+  3. **Micro-Presets & Migrate `lumetri_presets`:** Đóng gói các hiệu ứng phổ biến thành Micro-Presets `.preset.json` (1–2 Atomic Nodes cài sẵn) và chuyển đổi dần `lumetri_presets` sang `ColorGrade` Presets kèm lộ trình nâng cấp Atomic Nodes tương ứng.

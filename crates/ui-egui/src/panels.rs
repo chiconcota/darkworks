@@ -36,6 +36,7 @@ pub mod node_graph;
 pub mod node_graph_bridge;
 pub mod node_graph_groups;
 pub mod node_graph_menus;
+pub mod node_graph_presets;
 pub mod notes;
 pub mod panel_state;
 pub mod presets;

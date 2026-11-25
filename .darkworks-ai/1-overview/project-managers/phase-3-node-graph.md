@@ -148,9 +148,11 @@
 
 - [x] **Task 3.11 [Giao Diện Nối Cầu Node Graph ⇄ Timeline ⇄ Program Monitor (`crates/ui-egui`)]:**
   - Đã triển khai `crates/ui-egui/src/panels/node_graph_bridge.rs`: đồng bộ khi chọn clip, các nút `📌 Apply to Clip`, `🎬 Add as FX Clip`, `📝 New Graph (Nháp)`, `🗑 Gỡ khỏi Clip`, kích hoạt `[ ▶ RUN WORKFLOW ]` trên `ActionNode`, live sync khi nhả chuột, và badge `◈` màu Cyan trên Timeline (`clips.rs`).
-- [ ] **Task 3.12 [Kho Preset `.preset.json` Thật: Export/Import File & Thư Mục User Presets]:**
-  - Nâng cấp `💾 Export Preset` dùng `FileDialog::save_as` ghi file `.preset.json` theo cấu trúc `NodeGraphDoc` đầy đủ (`nodes` + `pos` + `custom_title` + `wires` + `groups`).
-  - Bổ sung `📥 Import Preset…` (`FileDialog::open_file`) và lưu vào thư mục User Presets để hiển thị ngay trong **Thư viện Preset** dùng 1-click (hỗ trợ cả **Replace** và **Chain** khi áp lên clip đang có Node Graph).
+- [x] **Task 3.12 [Kho Preset `.preset.json` Thật: Export/Import File & Thư Mục User Presets]:**
+  - Đã chuẩn hóa `NodeGraphPresetDoc` (`crates/node-graph-core/src/preset.rs`), `💾 Save Preset` (Lưu vào `<data_dir>/Node Presets/` dùng chung mọi project), `💾 Export .preset.json` (`Save As`), `📥 Import Preset` (`Open File`), và 2 chế độ **Thay thế (Replace)** / **Nối tiếp trước `Final Output` (Chain)**.
+- [ ] **Task 3.13 [Node & Preset Library Browser (Search, Filter, Thumbnail Preview & Kéo-Thả)]:**
+  - Nâng cấp giao diện chọn Preset từ menu thả xuống sang **Preset Library Browser** (tìm kiếm real-time, lọc Category/Tag/Favorites, lưới Thumbnail xem trước được render qua Node Graph trên `preview_image`, Quick Search `Tab` trên Canvas, và kéo thả thẳng từ Library vào Node Graph hoặc Clip trên Timeline).
+  - Đóng gói các Micro-Presets (Blur/Glow/Distort/Flip/Keyer) và chuyển bộ `lumetri_presets` sang `ColorGrade` Presets.
 
 ### Tiêu chuẩn nghiệm thu bổ sung (DoD 3.10 – 3.14)
 
