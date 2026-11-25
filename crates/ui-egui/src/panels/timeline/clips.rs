@@ -281,8 +281,16 @@ pub(super) fn draw_clip(
             },
         );
     }
-    // fx badge right-aligned in the header (italic-ish "fx")
-    if (it.has_standard_effects() || it.has_modified_intrinsics()) && w > 40.0 {
+    // fx / node-graph badge right-aligned in the header
+    if it.node_graph.is_some() && w > 40.0 {
+        clip_p.text(
+            pos2(body.max.x - 6.0, body.min.y + 8.5),
+            Align2::RIGHT_CENTER,
+            "◈",
+            Tokens::ui(11.5),
+            Color32::from_rgb(0, 210, 255),
+        );
+    } else if (it.has_standard_effects() || it.has_modified_intrinsics()) && w > 40.0 {
         let col = if it.has_standard_effects() { Color32::from_rgb(0xe8, 0xc5, 0x4a) } else { Color32::from_rgb(0x91, 0xa2, 0xac) };
         clip_p.text(
             pos2(body.max.x - 6.0, body.min.y + 8.5),

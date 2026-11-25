@@ -26,6 +26,8 @@ pub mod luts;
 pub mod mask;
 pub mod mixer;
 pub mod multicam;
+pub mod node_graph;
+mod nodes;
 pub mod offline;
 pub mod plan;
 pub mod preview;
@@ -287,6 +289,12 @@ fn seq_canvas(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, s
                 continue;
             }
             let below = canvas.snapshot();
+            if item.node_graph.is_some()
+                && let Some(adj) = node_graph::eval_item_graph(project, seq, item, t, opts, sources, None, Some(&below))
+            {
+                canvas.set(adj);
+                continue;
+            }
             let (adj, bl) = adjustment_layer(project, seq, item, t, opts, &tc, &below);
             if bl == Blend::Normal {
                 // The adjusted picture already replaces the original (see `adjustment_layer`).
@@ -297,6 +305,16 @@ fn seq_canvas(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, s
                 canvas.set(out);
             }
             continue;
+        }
+        if opts.effects && item.node_graph.is_some() {
+            let clip_img = item_layer_ex(project, seq, item, t, opts, sources, LayerWant { tc: &tc, allow_region: false })
+                .map(|l| l.into_full(w, h).0);
+            let below = canvas.snapshot();
+            if let Some(img) = node_graph::eval_item_graph(project, seq, item, t, opts, sources, clip_img.as_ref(), Some(&below)) {
+                blend::composite(canvas.get(), &img, 1.0, Blend::Normal);
+                pool::recycle_f32(img.px);
+                continue;
+            }
         }
         match item_layer_ex(project, seq, item, t, opts, sources, LayerWant { tc: &tc, allow_region: true }) {
             Some(Layer::Full { image, opacity, blend: bl, opaque }) => {

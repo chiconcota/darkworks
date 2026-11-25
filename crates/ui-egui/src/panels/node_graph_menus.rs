@@ -57,6 +57,8 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
                 gamma: 1.0,
                 invert: false,
                 black_and_white: false,
+                tint_color: [1.0, 1.0, 1.0, 1.0],
+                tint_amount: 0.0,
             });
             ui.close();
         }
@@ -200,48 +202,35 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
     });
 }
 
+fn load_preset_into_scratchpad(state: &mut NodeGraphState, kind: BuiltinPresetKind, label: &str) {
+    state.push_undo();
+    let (snarl, groups) = NodeGraphPreset::load_builtin(kind);
+    state.snarl = snarl;
+    state.groups = groups;
+    state.custom_titles.clear();
+    state.selected_group = None;
+    state.last_hovered_group = None;
+    state.detach_to_scratchpad();
+    state.status_message = format!(
+        "Đã nạp: {label} (Nháp — bấm 'Add as FX Clip' để tạo mới hoặc 'Apply to Clip' để gắn clip đang chọn)"
+    );
+}
+
 /// Hiển thị Menu nạp 5 Presets mẫu chuẩn
 pub fn render_load_preset_menu(ui: &mut Ui, state: &mut NodeGraphState) {
     ui.menu_button("📂 Load Preset", |ui| {
-        if ui.button("1. 📰 News Ticker Banner").clicked() {
-            state.push_undo();
-            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::NewsTickerBanner);
-            state.snarl = snarl;
-            state.groups = groups;
-            state.status_message = "Đã nạp: 1. News Ticker Banner".to_string();
-            ui.close();
-        }
-        if ui.button("2. 🌊 Audio Waveform Line (60 FPS)").clicked() {
-            state.push_undo();
-            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::ContinuousAudioWaveform);
-            state.snarl = snarl;
-            state.groups = groups;
-            state.status_message = "Đã nạp: 2. Continuous Audio Waveform Line".to_string();
-            ui.close();
-        }
-        if ui.button("3. 🎯 Spotlight Invert").clicked() {
-            state.push_undo();
-            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::SpotlightInvert);
-            state.snarl = snarl;
-            state.groups = groups;
-            state.status_message = "Đã nạp: 3. Spotlight Invert".to_string();
-            ui.close();
-        }
-        if ui.button("4. ⚡ Audio Beat Invert Flash").clicked() {
-            state.push_undo();
-            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::AudioBeatFlash);
-            state.snarl = snarl;
-            state.groups = groups;
-            state.status_message = "Đã nạp: 4. Audio Beat Invert Flash".to_string();
-            ui.close();
-        }
-        if ui.button("5. ✨ Cinematic Soft Glow").clicked() {
-            state.push_undo();
-            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::CinematicSoftGlow);
-            state.snarl = snarl;
-            state.groups = groups;
-            state.status_message = "Đã nạp: 5. Cinematic Soft Glow".to_string();
-            ui.close();
+        const PRESETS: &[(&str, BuiltinPresetKind, &str)] = &[
+            ("1. 📰 News Ticker Banner", BuiltinPresetKind::NewsTickerBanner, "1. News Ticker Banner"),
+            ("2. 🌊 Audio Waveform Line (60 FPS)", BuiltinPresetKind::ContinuousAudioWaveform, "2. Continuous Audio Waveform Line"),
+            ("3. 🎯 Spotlight Invert", BuiltinPresetKind::SpotlightInvert, "3. Spotlight Invert"),
+            ("4. ⚡ Audio Beat Invert Flash", BuiltinPresetKind::AudioBeatFlash, "4. Audio Beat Invert Flash"),
+            ("5. ✨ Cinematic Soft Glow", BuiltinPresetKind::CinematicSoftGlow, "5. Cinematic Soft Glow"),
+        ];
+        for &(btn_text, kind, label) in PRESETS {
+            if ui.button(btn_text).clicked() {
+                load_preset_into_scratchpad(state, kind, label);
+                ui.close();
+            }
         }
     });
 }

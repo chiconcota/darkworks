@@ -39,6 +39,7 @@ use filmcraft_render::Blend;
 use filmcraft_render::plan::{DeviceCaps, FramePlan, PlanLayer, PlanStep};
 
 pub mod adapter;
+pub mod custom_wgsl;
 pub mod export_renderer;
 pub mod fx;
 pub mod lut;
@@ -1306,7 +1307,7 @@ const MAP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
 ///
 /// So the callback is taken with a timeout of our own. Anything late is `None`: the CPU renderer
 /// takes the frame, which is what the poll's timeout was always meant to arrange.
-fn wait_mapped<T>(device: &wgpu::Device, rx: &std::sync::mpsc::Receiver<Result<(), T>>) -> Option<()> {
+pub(crate) fn wait_mapped<T>(device: &wgpu::Device, rx: &std::sync::mpsc::Receiver<Result<(), T>>) -> Option<()> {
     device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(MAP_TIMEOUT) }).ok()?;
     rx.recv_timeout(MAP_TIMEOUT).ok()?.ok()
 }
@@ -1341,7 +1342,7 @@ const UNIFORM_FLOATS: usize = 52;
 
 /// Poll a future once: wgpu's native error scopes resolve immediately. `None` if it is still
 /// pending (then the caller assumes the worst).
-fn poll_now<F: std::future::Future>(f: F) -> Option<F::Output> {
+pub(crate) fn poll_now<F: std::future::Future>(f: F) -> Option<F::Output> {
     let mut f = std::pin::pin!(f);
     match f.as_mut().poll(&mut std::task::Context::from_waker(std::task::Waker::noop())) {
         std::task::Poll::Ready(v) => Some(v),

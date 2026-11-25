@@ -33,6 +33,7 @@ pub mod monitor_view;
 pub mod motion_path;
 pub mod multicam;
 pub mod node_graph;
+pub mod node_graph_bridge;
 pub mod node_graph_groups;
 pub mod node_graph_menus;
 pub mod notes;

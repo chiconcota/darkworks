@@ -127,6 +127,9 @@ pub struct TrackItem {
     /// ([`GraphicMeta`]). Schema v12.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graphic: Option<Box<GraphicMeta>>,
+    /// Darkworks DAG Node Graph gắn trực tiếp lên clip hoặc adjustment/overlay layer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_graph: Option<Box<darkworks_node_graph_core::NodeGraphDoc>>,
 }
 
 /// Time interpolation for speed-changed clips (Clip ▸ Video Options ▸ Time Interpolation).

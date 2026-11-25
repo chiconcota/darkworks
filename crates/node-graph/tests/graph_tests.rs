@@ -371,6 +371,8 @@ fn test_18_atomic_nodes_creation_and_sockets() {
             gamma: 1.0,
             invert: true,
             black_and_white: false,
+            tint_color: [1.0, 1.0, 1.0, 1.0],
+            tint_amount: 0.0,
         },
         DarkNode::BlurSharpen {
             blur_type: BlurType::BokehBloom,
@@ -463,6 +465,8 @@ fn test_color_grade_invert_title_and_transform_flips() {
         gamma: 1.0,
         invert: true,
         black_and_white: false,
+        tint_color: [1.0, 1.0, 1.0, 1.0],
+        tint_amount: 0.0,
     };
     assert_eq!(invert_node.title(), "🎨 Color Grade (Invert)");
 
@@ -475,6 +479,8 @@ fn test_color_grade_invert_title_and_transform_flips() {
         gamma: 1.0,
         invert: false,
         black_and_white: true,
+        tint_color: [1.0, 1.0, 1.0, 1.0],
+        tint_amount: 0.0,
     };
     assert_eq!(bw_node.title(), "🎨 Color Grade (B&W)");
 

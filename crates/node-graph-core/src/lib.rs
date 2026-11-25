@@ -1,0 +1,22 @@
+//! # Darkworks Node Graph Core (`darkworks-node-graph-core`)
+//!
+//! Lõi dữ liệu thuần (không phụ thuộc UI/`egui`) cho hệ thống đồ thị DAG của Darkworks.
+//! Được chia sẻ an toàn giữa `crates/project` (L1), `crates/render` (L3), `crates/engine` (L4)
+//! và `crates/node-graph` (L5).
+
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
+pub mod custom_shader;
+pub mod doc;
+pub mod evaluator;
+pub mod node;
+pub mod types;
+
+pub use custom_shader::{WgslError, WgslParser, WgslUniform};
+pub use doc::{NodeEntry, NodeGraphDoc, NodeWire, VisualGroupDoc};
+pub use evaluator::{DagDocPlan, DagDocStep, DagError, DagEvaluator, EvaluationContext};
+pub use node::{
+    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TimeMode,
+    TransitionType,
+};
+pub use types::NodeDataType;

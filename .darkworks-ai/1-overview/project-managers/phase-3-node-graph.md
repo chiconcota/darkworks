@@ -1,5 +1,5 @@
 # KẾ HOẠCH DỰ ÁN: GIAI ĐOẠN 3 (phase-3-node-graph.md)
-@project: DARKWORKS | @phase: 3 | @status: 🟢 HOÀN THÀNH 100%
+@project: DARKWORKS | @phase: 3 | @status: 🟡 ĐANG TRIỂN KHAI (Bổ Sung Phần Nối Cầu Timeline & Render)
 @goal: Đồ thị DAG Node Graph (egui_snarl), Hệ sinh thái 18 Versatile Atomic Nodes bản đầy đủ (Full Production-Ready), Hợp nhất 93 Shaders WGSL, Black Node Subgraphs, Action Node Automation, và ComfyUI Canvas Ergonomics.
 
 ---
@@ -126,3 +126,36 @@
 - [x] **DoD 3.7 (Kho 5 Built-in Presets):** Nạp 1-click cả 5 presets mẫu chạy mượt mà, DAG hợp lệ 100%.
 - [x] **DoD 3.8 (Tests & Lints):** 11/11 tests pass 100%, clippy sạch 0 cảnh báo.
 - [x] **DoD 3.9 (Audit Code Ceiling):** 10/10 files Darkworks mới < 700 dòng, tuân thủ tuyệt đối chuẩn mực kiến trúc.
+
+---
+
+## 5. KẾ HOẠCH BỔ SUNG: NỐI CẦU NODE GRAPH ➔ TIMELINE & RENDER (TASKS 3.8 – 3.11)
+
+> **Ràng buộc kiến trúc cần xử lý (`cargo xtask layers`):**  
+> Các crate từ tầng L0–L4 (`project`, `render`, `gpu`, `engine`) bị cấm phụ thuộc vào `egui` (`UI_ONLY` trong `xtask/src/main.rs`), trong khi `darkworks-node-graph` hiện đang kéo `egui` và `egui-snarl`. Do đó, cần tách phần dữ liệu thuần + logic đánh giá DAG ra khỏi tầng UI `egui` trước khi gắn vào Timeline và Compositor.
+
+- [x] **Task 3.8 [Tách Data Model & Gắn Node Graph vào Project/Timeline (`crates/project`, `crates/node-graph`, `crates/engine`)]:**
+  - Đã tạo crate thuần dữ liệu `crates/node-graph-core` (Layer 0, không `egui`) chứa `NodeGraphDoc`, `DarkNode`, `DagEvaluator`, `WgslParser` và cầu nối `doc_from_snarl` / `snarl_from_doc` trong `crates/node-graph`.
+  - Đã thêm `pub node_graph: Option<Box<NodeGraphDoc>>` vào `TrackItem` (`crates/project/src/track.rs`).
+  - Đã bổ sung `nodeGraph.setOnClip`, `nodeGraph.createOverlayClip`, `nodeGraph.applyScope`, `nodeGraph.clearFromClip`, `nodeGraph.getFromClip` vào `crates/engine/src/node_graph.rs`.
+
+- [x] **Task 3.9 [Bộ Thực Thi DAG Compositor Trong `crates/render` (CPU Reference + Live Signals)]:**
+  - Đã triển khai `crates/render/src/node_graph.rs` + `node_graph_ops.rs` và nối vào `seq_canvas` (`lib.rs`) và `plan.rs` cho cả media/graphic clips lẫn adjustment/overlay layers.
+  - Hỗ trợ `VideoInput`, `ShapeGenerator`, `TextGenerator`, `ColorGrade`, `BlurSharpen`, `DistortLens`, `Keyer`, `Transform2D`, `CropMask`, `Blend` (26 modes + Mask), `Transition`, `TimeDriver`, `AudioReactor` (RMS/band từ `mix_sequence`).
+
+- [x] **Task 3.10 [Tối Ưu GPU (`CustomWgsl` & `wgpu` Pipeline) (`crates/gpu`, `crates/render`)]:**
+  - Đã triển khai `crates/gpu/src/custom_wgsl.rs` biên dịch an toàn qua `push_error_scope` (cache tối đa 32 pipelines) và hook `register_wgsl_runner` từ `apps/darkworks` & `apps/darkworks-cli`.
+
+- [x] **Task 3.11 [Giao Diện Nối Cầu Node Graph ⇄ Timeline ⇄ Program Monitor (`crates/ui-egui`)]:**
+  - Đã triển khai `crates/ui-egui/src/panels/node_graph_bridge.rs`: đồng bộ khi chọn clip, các nút `📌 Apply to Clip`, `🎬 Add as FX Clip`, `📝 New Graph (Nháp)`, `🗑 Gỡ khỏi Clip`, kích hoạt `[ ▶ RUN WORKFLOW ]` trên `ActionNode`, live sync khi nhả chuột, và badge `◈` màu Cyan trên Timeline (`clips.rs`).
+- [ ] **Task 3.12 [Kho Preset `.preset.json` Thật: Export/Import File & Thư Mục User Presets]:**
+  - Nâng cấp `💾 Export Preset` dùng `FileDialog::save_as` ghi file `.preset.json` theo cấu trúc `NodeGraphDoc` đầy đủ (`nodes` + `pos` + `custom_title` + `wires` + `groups`).
+  - Bổ sung `📥 Import Preset…` (`FileDialog::open_file`) và lưu vào thư mục User Presets để hiển thị ngay trong **Thư viện Preset** dùng 1-click (hỗ trợ cả **Replace** và **Chain** khi áp lên clip đang có Node Graph).
+
+### Tiêu chuẩn nghiệm thu bổ sung (DoD 3.10 – 3.14)
+
+- [x] **DoD 3.10 (`News Ticker Banner`):** Nạp Preset 1 ➔ bấm `🎬 Add as FX Clip` ➔ xuất hiện clip trên Track V2 ➔ phát Timeline thấy dải nền bo góc + chữ chạy ngang trên Program Monitor (chờ nghiệm thu trực quan).
+- [ ] **DoD 3.11 (`Spotlight Invert` & `Cinematic Soft Glow`):** Bấm `📌 Apply to Clip` (hoặc chạy `ActionNode` theo `[Mark In, Mark Out]`) ➔ đổi hiệu ứng trực tiếp trên Program Monitor và hoàn tác được bằng `Ctrl + Z` (chờ nghiệm thu trực quan).
+- [ ] **DoD 3.12 (`Audio Beat Flash` / `Audio Waveform`):** Phát clip có âm thanh ➔ hiệu ứng phản ứng đồng bộ theo nhịp âm thanh trên Program Monitor (chờ nghiệm thu trực quan).
+- [x] **DoD 3.13 (Kiểm toán & Tương thích):** `cargo xtask layers` pass 100%, `cargo clippy` 0 warning, toàn bộ file mới/sửa `< 700 dòng` (`audit.py` 0 vi phạm), unit tests `render` & `engine` round-trip `project.json` PASS.
+- [ ] **DoD 3.14 (Kho Preset `.preset.json` Thật):** Xuất file `.preset.json` ra ổ đĩa ➔ `Clear All` ➔ Import lại giữ nguyên 100% node, tọa độ, dây nối và Visual Groups; xuất hiện trong thư viện Preset lưu sẵn.

@@ -280,6 +280,7 @@ impl filmcraft_export::FrameRenderer for GpuFrameRenderer {
 }
 
 fn register_gpu_frame_renderer() {
+    filmcraft_render::node_graph::register_wgsl_runner(filmcraft_gpu::custom_wgsl::run_custom_wgsl);
     filmcraft_export::register_frame_renderer(|| {
         filmcraft_gpu::ExportRenderer::new().map(|r| Box::new(GpuFrameRenderer(r)) as Box<dyn filmcraft_export::FrameRenderer>)
     });

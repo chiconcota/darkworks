@@ -19,6 +19,9 @@ Bản đồ tính năng phân định rạch ròi 100% giữa **Lớp nền kỹ
 | `DW-03` | [Lightworks Mark & Park Editing](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_lightworks_editing.md) | ⚡ **Darkworks Core** | 🟡 Đang cấy ghép | Phím tắt I/O/P, Extract (X), Lift (Z), Split (S), dải sáng Cyan Highlight toàn tracks |
 | `DW-04` | [Vello Canvas 2D GPU Node](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_vello_canvas.md) | ⚡ **Darkworks Core** | ⚪ Sắp tới | Vello + Cosmic-text vẽ Text Karaoke nhảy màu, vector SVG bằng Compute Shader (Zero RAM web) |
 | `DW-05` | [AI Local Silence Cut & Subtitles](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_ai_vad_silence.md) | ⚡ **Darkworks Core** | ⚪ Sắp tới | Silero VAD băm sạch khoảng lặng dưới 5s, Whisper offline tạo phụ đề tự động |
+| `DW-06` | [Kho Preset Node Graph (.preset.json Thật)](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_node_presets_keyframes_migration.md#L23-L52) | ⚡ **Darkworks Core** | ⚪ Sắp tới (Phase 3.12) | Export/Import file `.preset.json` đủ `wires` + `pos`, Thư viện Preset lưu sẵn 1-click, Replace/Chain |
+| `DW-07` | [Node Keyframes & KeyframeCurve Node](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_node_presets_keyframes_migration.md#L55-L81) | ⚡ **Darkworks Core** | ⚪ Sắp tới (Phase 4) | Đặt/sửa keyframe theo `Tick` (Linear/Ease) trên thông số Node & `KeyframeCurve` cắm dây 1 lái N |
+| `DW-08` | [Thay Thế & Xóa Sạch Effects/Effect Controls Cũ](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_node_presets_keyframes_migration.md#L84-L111) | ⚡ **Darkworks Core** | ⚪ Sắp tới (Phase 4–5) | Nối Transform Handles, Audio/Transition Nodes & loại bỏ hoàn toàn panel `Effects` / `Effect Controls` cũ |
 
 ---
 

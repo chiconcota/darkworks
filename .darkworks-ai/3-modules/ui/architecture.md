@@ -26,6 +26,9 @@ Chịu trách nhiệm hiển thị toàn bộ giao diện 60fps siêu mượt b�
      - Hai mốc ngoặc vuông `[` (In) và `]` (Out) màu Cyan nổi bật trên thanh Ruler.
 4. **Audio Track Mixer ([panels/mixer.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/mixer.rs)):**
    - Bộ trộn âm thanh đa kênh, faders, VU meters theo chuẩn LUFS / dBTP.
+5. **Node Graph Panel & Timeline Bridge ([panels/node_graph.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph.rs), [panels/node_graph_bridge.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_bridge.rs)):**
+   - Giao diện đồ thị `egui_snarl` với menu thêm 18 Atomic Nodes / 5 Built-in Presets ([panels/node_graph_menus.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_menus.rs)) và Visual Groups ([panels/node_graph_groups.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_groups.rs)).
+   - Cầu nối đồng bộ xuống Timeline & Program Monitor: `📌 Apply to Clip`, `🎬 Add as FX Clip`, `📝 New Graph (Nháp)` (tách sang chế độ Nháp qua `detach_to_scratchpad()` tránh live-sync ghi đè Clip cũ khi `Load Preset` / `Clear All` / `Reset`), `🗑 Gỡ khỏi Clip`, và badge `◈` Cyan trên clip Timeline ([clips.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/timeline/clips.rs)).
 
 ## 3. CÁC HỆ THỐNG PHỤ TRỢ CỐT LÕI
 - **Lịch sử Undo / Redo Toàn Cục:**

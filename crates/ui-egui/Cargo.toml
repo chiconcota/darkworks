@@ -29,6 +29,7 @@ filmcraft-gpu = { workspace = true }
 filmcraft-scopes = { workspace = true }
 egui = { workspace = true }
 egui_extras = { workspace = true }
+darkworks-node-graph-core = { workspace = true }
 darkworks-node-graph = { workspace = true }
 egui-snarl = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "clipboard"] }

@@ -202,7 +202,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         });
 
         ui.menu_button("🎨 Color & Keying", |ui| {
-            if ui.button("🎨 Color Grade").clicked() { snarl.insert_node(pos, DarkNode::ColorGrade { exposure: 0.0, contrast: 1.0, saturation: 1.0, temperature: 0.0, tint: 0.0, gamma: 1.0, invert: false, black_and_white: false }); ui.close(); }
+            if ui.button("🎨 Color Grade").clicked() { snarl.insert_node(pos, DarkNode::ColorGrade { exposure: 0.0, contrast: 1.0, saturation: 1.0, temperature: 0.0, tint: 0.0, gamma: 1.0, invert: false, black_and_white: false, tint_color: [1.0, 1.0, 1.0, 1.0], tint_amount: 0.0 }); ui.close(); }
             if ui.button("🟢 Ultra Keyer").clicked() { snarl.insert_node(pos, DarkNode::Keyer { key_color: [0.0, 1.0, 0.0], similarity: 0.4, smoothness: 0.1, spill_suppress: 0.5 }); ui.close(); }
         });
 
@@ -508,7 +508,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         if resp.hovered() {
             ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
         }
-        PinInfo::circle().with_fill(data_type.color())
+        PinInfo::circle().with_fill(crate::types::pin_color32(data_type))
     }
 
     fn show_output(
@@ -543,7 +543,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         if resp.hovered() {
             ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
         }
-        PinInfo::circle().with_fill(data_type.color())
+        PinInfo::circle().with_fill(crate::types::pin_color32(data_type))
     }
 
     fn has_body(&mut self, node: &DarkNode) -> bool {

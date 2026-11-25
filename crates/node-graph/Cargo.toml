@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+darkworks-node-graph-core = { workspace = true }
 egui = { workspace = true }
 egui-snarl = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

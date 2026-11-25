@@ -15,9 +15,9 @@
 flowchart TD
     P1["🟢 GIAI ĐOẠN 1: TIẾP NHẬN NỀN TẢNG FILMCRAFT & KHÓA TRẦN RAM\n(Workspace 33 Crates, VA-API Linux Zero-Copy, A/V Clock cpal, Xóa Updater)"]
     P2["🟢 GIAI ĐOẠN 2: CẤY GHÉP TIMELINE LIGHTWORKS CHUẨN MỰC\n(Mark In/Out I-O-P, Extract X, Lift Z, Split S, Dải Cyan Highlight Toàn Track)"]
-    P3["🟡 GIAI ĐOẠN 3: ĐỒ THỊ DAG NODE GRAPH & 93 WGSL SHADERS (CỐT LÕI)\n(egui_snarl DAG, Bỏ Linear Effect Stack, 93 Shaders Atomic Nodes, Audio Motion)"]
-    P4["⚪ GIAI ĐOẠN 4: CANVAS 2D NODE THUẦN GPU (VELLO)\n(Vello Compute Shaders, Node Text Karaoke đổi màu, Node Vector/SVG)"]
-    P5["⚪ GIAI ĐOẠN 5: AI LOCAL & BUỒNG LÁI TỰ ĐỘNG HÓA MCP\n(Silero VAD băm khoảng lặng, Whisper Subtitle, rmcp Server CLI)"]
+    P3["🟡 GIAI ĐOẠN 3: ĐỒ THỊ DAG NODE GRAPH, 93 SHADERS & KHO PRESET .preset.json\n(egui_snarl DAG, 18 Atomic Nodes, Audio Motion, Thư viện Preset lưu sẵn)"]
+    P4["⚪ GIAI ĐOẠN 4: VELLO CANVAS 2D, KEYFRAME & ẨN EFFECT CONTROLS CŨ\n(Vello Karaoke/SVG, Keyframe Params & Spline Node, Transform Handles -> Transform2D)"]
+    P5["⚪ GIAI ĐOẠN 5: AI LOCAL, MCP & XÓA SẠCH EFFECTS / EFFECT CONTROLS CŨ\n(Silero VAD, Whisper, rmcp CLI, Audio/Transition Nodes, Xóa Panel Effects cũ)"]
     P6["⚪ GIAI ĐOẠN 6: EXPORT PIPELINE, TỐI ƯU & PHÁT HÀNH\n(Xuất MP4 H.264/ProRes phần cứng, Đóng gói Linux AppImage / Release)"]
 
     P1 --> P2 --> P3 --> P4 --> P5 --> P6
@@ -110,13 +110,17 @@ flowchart TD
 - [ ] **Task 3.7 [Chuyển Đổi 93 WGSL Shaders & Thay Thế Effect Controls]:**
   - Đóng gói toàn bộ 93 file Shader WGSL từ `crates/render` thành catalog Atomic Nodes chuẩn.
   - Thay thế bảng Effect Controls cũ của Premiere bằng Node Graph Panel & Node Inspector.
-- **Tiêu chuẩn nghiệm thu (DoD 3):** Mở panel Node Graph 60fps; tạo dải News Ticker (nền xanh, chữ đen, chạy góc dưới) mượt mà 60fps; phân lập effect trên V1 và V2 đè lên trên; gom cụm thành Black Node và xuất `.preset.json`; nhấn Run trên Action Node áp effect hàng loạt vùng In/Out; gõ code WGSL trong Custom Shader Node JIT compile hiển thị tức thì; RAM luôn `< 2GB` và file `< 700 dòng`.
+- [ ] **Task 3.8 [Kho Preset `.preset.json` Thật (Export / Import / Thư Viện Preset Lưu Sẵn)]:**
+  - Nâng cấp `💾 Export Preset` dùng hộp thoại file `FileDialog::save_as` lưu file `.preset.json` thật trên ổ đĩa dựa theo cấu trúc `NodeGraphDoc` đầy đủ (`nodes`, `pos`, `custom_title`, `wires`, `groups`) thay vì chỉ copy Clipboard.
+  - Thêm `📥 Import Preset…` (`FileDialog::open_file`) và lưu vào thư mục User Presets để tự động quét hiện ngay trong **Thư viện Preset** dùng 1-click.
+  - Hỗ trợ 2 chế độ khi áp Preset lên Clip đang có Node Graph: **Thay thế (Replace)** hoặc **Nối tiếp trước `Final Output` (Chain/Append)**.
+- **Tiêu chuẩn nghiệm thu (DoD 3):** Mở panel Node Graph 60fps; tạo dải News Ticker (nền xanh, chữ đen, chạy góc dưới) mượt mà 60fps; phân lập effect trên V1 và V2 đè lên trên; Export/Import file `.preset.json` giữ nguyên 100% dây nối & vị trí node; nhấn Run trên Action Node áp effect hàng loạt vùng In/Out; gõ code WGSL trong Custom Shader Node JIT compile hiển thị tức thì; RAM luôn `< 2GB` và file `< 700 dòng`.
 
 ---
 
-## ⚪ GIAI ĐOẠN 4: CANVAS 2D NODE THUẦN GPU (VELLO) (PHASE 4)
+## ⚪ GIAI ĐOẠN 4: CANVAS 2D NODE THUẦN GPU (VELLO) & HỆ THỐNG KEYFRAME NODE GRAPH (PHASE 4)
 **Trạng thái:** ⚪ **CHỜ TRIỂN KHAI**  
-**Mục tiêu:** Đưa engine đồ họa vector Vello + Cosmic-text vào mạng lưới Node Graph để tạo chữ Karaoke nhảy màu, biểu đồ, infographic vẽ trực tiếp bằng Compute Shader trên VRAM GPU (Zero-Copy), không nhúng Web Browser tiết kiệm 1GB RAM.
+**Mục tiêu:** Đưa engine đồ họa vector Vello + Cosmic-text vào mạng lưới Node Graph để tạo chữ Karaoke nhảy màu, biểu đồ, infographic vẽ trực tiếp bằng Compute Shader trên VRAM GPU (Zero-Copy), không nhúng Web Browser tiết kiệm 1GB RAM; đồng thời bổ sung **Hệ thống Keyframe & `KeyframeCurve` Node** theo `Tick` để kiểm soát chính xác hoạt ảnh theo thời gian song song với Procedural Motion.
 
 - [ ] **Task 4.1 [Vello Compute Pipeline]:**
   - Tích hợp `vello` và `cosmic-text` làm Generator Node trong đồ thị Node Graph, render vector thẳng sang `wgpu::Texture`.
@@ -127,13 +131,23 @@ flowchart TD
   - Node vẽ vector: Chữ nhật bo góc, hình tròn, đa giác, nạp file `.svg` sắc nét vô cực ở mọi độ phân giải.
 - [ ] **Task 4.4 [Node Canvas Composite]:**
   - Gom cụm chữ, hình khối và thanh viền thành cụm đồ họa hoàn chỉnh (Lower-third tin tức, bảng phụ đề).
-- **Tiêu chuẩn nghiệm thu (DoD 4):** Phụ đề Karaoke nhảy màu theo giọng nói mượt mà 60fps; phóng to vector không vỡ hạt; tiết kiệm hoàn toàn 1GB RAM so với việc nhúng Chromium.
+- [ ] **Task 4.5 [Keyframe Trực Tiếp Trên Tham Số Node (`DarkNode` Keyframing)]:**
+  - Mở rộng `crates/node-graph-core` với cấu trúc `NodeKeyframeTrack` (lưu mốc theo `Tick` nguyên thủy, chế độ nội suy `Hold`, `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` / Cubic Bezier, mặc định `#[serde(default)]` giữ tương thích ngược 100% với `project.json` & `.preset.json` cũ).
+  - Hỗ trợ đặt/xóa/nhảy mốc keyframe (`◀ ◆ ▶`) ngay trên UI của các tham số chính (`Transform2D`, `ColorGrade`, `BlurSharpen`, `DistortLens`, `CropMask`, `Blend`, `TextGenerator`, `ShapeGenerator`) đồng bộ theo vị trí Playhead trên Timeline và hỗ trợ Undo/Redo.
+- [ ] **Task 4.6 [Node `KeyframeCurve` / Spline Signal & Phối Hợp Procedural Motion]:**
+  - Thêm Node `KeyframeCurve` xuất tín hiệu `Scalar` (`f32`) theo thời gian `Tick` (hỗ trợ chế độ theo thời gian tuyệt đối của clip hoặc chuẩn hóa `0% -> 100%` để đóng gói vào `.preset.json`).
+  - Cho phép **1 đường Keyframe lái nhiều Node cùng lúc** qua các socket `Mod` (`Pos Mod`, `Scale Mod`, `Rot Mod`, `Opacity Mod`, `Intensity Mod`, `Progress Mod`) và kết hợp tự do với `TimeDriver` / `AudioReactor` (ví dụ envelope vào/ra mượt nhân với nhịp bass).
+- [ ] **Task 4.7 [Đồng Bộ Transform Handles, Kho Video Preset Lưu Sẵn & Ẩn `Effect Controls` / `Video Effects` Cũ]:**
+  - Nối thao tác kéo thả khung Transform trên Program Monitor (`transform_handles.rs`) trực tiếp vào `Transform2D` Node (hỗ trợ đặt keyframe `Position`/`Scale`/`Rotation` thẳng vào Node Graph).
+  - Đóng gói trọn bộ hiệu ứng Video & Color Grading phổ biến của FilmCraft thành kho **Node Graph Presets (`.preset.json`) lưu sẵn** (Blur, Glow, Vignette, Color Presets, Blur/Distort, Motion Pop-in/out…).
+  - Ẩn tab `Effect Controls` và mục `Video Effects` cũ khỏi workspace UI mặc định để chuyển người dùng sang quy trình **Thư viện Node Presets + Node Graph** (vẫn giữ Audio FX & Transition điểm nối cho tới Phase 5).
+- **Tiêu chuẩn nghiệm thu (DoD 4):** Phụ đề Karaoke nhảy màu theo giọng nói mượt mà 60fps; phóng to vector không vỡ hạt; đặt được keyframe mượt (Linear/Ease) theo Playhead cho tham số Node lẫn dùng `KeyframeCurve` Node cắm dây điều khiển nhiều Node cùng lúc; kéo khung Transform trên Program Monitor ăn thẳng vào `Transform2D` Node; kho Video Presets lưu sẵn áp 1-click thay thế `Video Effects` & `Effect Controls` cũ.
 
 ---
 
-## ⚪ GIAI ĐOẠN 5: AI LOCAL & BUỒNG LÁI TỰ ĐỘNG HÓA MCP (PHASE 5)
+## ⚪ GIAI ĐOẠN 5: AI LOCAL, BUỒNG LÁI MCP & XÓA SẠCH `Effects` / `Effect Controls` FILMCRAFT (PHASE 5)
 **Trạng thái:** ⚪ **CHỜ TRIỂN KHAI**  
-**Mục tiêu:** Tích hợp mô hình AI chạy Offline nội bộ (Silero VAD băm khoảng lặng, Whisper sinh phụ đề, AI Visual Face Swap / Rembg) và mở cổng MCP Server (`rmcp`) cho AI Agent hoặc Antigravity CLI điều khiển tự động toàn bộ phần mềm.
+**Mục tiêu:** Tích hợp mô hình AI chạy Offline nội bộ (Silero VAD băm khoảng lặng, Whisper sinh phụ đề, AI Visual Face Swap / Rembg), mở cổng MCP Server (`rmcp`) và **hoàn tất thay thế nốt Audio FX / Timeline Transition để xóa bỏ hoàn toàn panel `Effects` & `Effect Controls` cũ của FilmCraft**.
 
 - [ ] **Task 5.1 [Local Silero VAD Worker]:**
   - Tích hợp Silero VAD qua `ort` (ONNX Runtime) trên luồng ngầm (`crates/ai-workers`).
@@ -149,7 +163,11 @@ flowchart TD
   - Mở cổng MCP Server nội bộ bằng `rmcp` trong `apps/darkworks-cli`.
   - Phơi bày toàn bộ lệnh `Session::execute` (cắt clip, nối dây shader, áp preset, tua playhead).
   - Cho phép AI Agent tự động dựng video theo yêu cầu qua terminal.
-- **Tiêu chuẩn nghiệm thu (DoD 5):** Bấm `Auto Cut Silence` băm sạch khoảng lặng video 10 phút dưới 5 giây; Whisper tạo phụ đề chuẩn 95%; Face Swap và tách nền AI chạy trơn tru trên Node Graph; điều khiển cắt ghép video từ prompt terminal thành công 100%.
+- [ ] **Task 5.5 [Audio DSP Nodes, Edit-Point Transition Bridge & Xóa Sạch `Effects` / `Effect Controls` Cũ]:**
+  - Bổ sung Audio DSP Nodes trong Node Graph (Volume, Pan, EQ, Audio Crossfade) hoặc tách gọn điều khiển âm lượng/EQ sang Audio Mixer + Node Graph.
+  - Nối cơ chế kéo-thả Preset `Transition` vào điểm nối (Edit Point) giữa 2 clip trên Timeline.
+  - Gỡ bỏ hoàn toàn panel `PanelKind::Effects` và `PanelKind::EffectControls` cũ khỏi giao diện Darkworks (`dock.rs`, `panels.rs`, menu `Window`), thay 100% bằng **Thư viện Node Presets + Node Graph Panel**.
+- **Tiêu chuẩn nghiệm thu (DoD 5):** Bấm `Auto Cut Silence` băm sạch khoảng lặng video 10 phút dưới 5 giây; Whisper tạo phụ đề chuẩn 95%; Face Swap và tách nền AI chạy trơn tru trên Node Graph; điều khiển cắt ghép video từ prompt terminal thành công 100%; UI không còn `Effects` / `Effect Controls` cũ nhưng mọi tính năng chỉnh màu, hiệu ứng video, audio FX, transition và keyframe đều chạy mượt qua Node Graph & kho Preset lưu sẵn.
 
 ---
 

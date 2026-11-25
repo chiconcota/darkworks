@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟢 Hoàn Thành (Phase 3) | Đồ thị DAG `egui_snarl`, Hệ sinh thái 18 Atomic Nodes bản đầy đủ (Full Production-Ready), DagEvaluator (Topological Sort + Cycle Proof), Kho 5 Built-in Presets, Visual Groups ComfyUI, JIT WGSL Reflection. | Sẵn sàng cho Giai Đoạn 4 (Canvas 2D Node Vello + Cosmic-text). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.12) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (27 Blend modes + ComboBox + Color Picker), `crates/render/src/nodes/` + `CustomWgsl` GPU, Timeline Bridge (`Apply to Clip` / `Add as FX Clip` / `New Graph (Nháp)`). | Triển khai Save Preset & Custom Preset `.preset.json` thật (Task 3.12 / `DW-06`). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -108,21 +108,28 @@ flowchart TD
     G1["Giai Đoạn 1: Lõi Player & Quản Lý RAM\n(Load video 1h, RAM < 2GB, phát mượt 60fps)"]
     G2["Giai Đoạn 2: Timeline & Cắt Ghép Cơ Bản\n(Thanh thời gian egui, Razor, Ripple Delete, Hot-Reload project.json)"]
     G3["Giai Đoạn 3: Hệ Thống Node Graph (DAG)\n(egui_snarl, nối dây GPU Texture, xuất/nạp .preset.json)"]
-    G4["Giai Đoạn 4: Tích Hợp Canvas 2D Generator Node\n(Vello + Cosmic-text vẽ Text Karaoke, Infographic lên VRAM)"]
-    G5["Giai Đoạn 5: AI Worker, Addon & Buồng Lái MCP\n(Auto Cut Silence, Auto Subtitle, Antigravity CLI điều khiển)"]
+    G4["Giai Đoạn 4: Canvas 2D (Vello), Keyframe & Ẩn Effect Controls Cũ\n(Vello Karaoke/SVG, Keyframe Params & Spline Node, Kho Video Presets)"]
+    G5["Giai Đoạn 5: AI Worker, MCP & Xóa Sạch Effects/Effect Controls Cũ\n(Auto Cut Silence, Whisper, Audio/Transition Nodes, Gỡ UI Effects cũ)"]
 
     G1 --> G2 --> G3 --> G4 --> G5
 ```
 
 - **Giai đoạn 1 (Tuần 1 - 2):** Khởi tạo khung sườn (tận dụng FilmCraft), kiểm chứng mức RAM < 2GB với video dài 1 tiếng.
 - **Giai đoạn 2 (Tuần 3 - 4):** Dựng Timeline cắt ghép cơ bản, Hot-reload qua file `project.json`.
-- **Giai đoạn 3 (Tuần 5 - 6):** Nâng cấp hệ thống hiệu ứng thành Node Graph (`egui_snarl`) và quản lý Preset JSON.
-- **Giai đoạn 4 (Tuần 7 - 8):** Gắn Canvas 2D Node vào mạng lưới Node để tạo hình chữ động / Karaoke.
-- **Giai đoạn 5 (Tuần 9+):** Tự động hóa bằng AI Local (VAD + Whisper) và cổng MCP cho Antigravity CLI.
+- **Giai đoạn 3 (Tuần 5 - 6):** Nâng cấp hệ thống hiệu ứng thành Node Graph (`egui_snarl`) và kho Preset `.preset.json` lưu sẵn (Export/Import file thật, thay thế dần bảng Effects).
+- **Giai đoạn 4 (Tuần 7 - 8):** Gắn Canvas 2D Node (Vello + Cosmic-text) vào mạng lưới Node để tạo hình chữ động / Karaoke, bổ sung hệ thống Keyframe (`Tick` + `KeyframeCurve` Node), nối Transform Handles với `Transform2D`, và ẩn `Video Effects` / `Effect Controls` cũ khỏi giao diện mặc định.
+- **Giai đoạn 5 (Tuần 9+):** Tự động hóa bằng AI Local (VAD + Whisper), cổng MCP cho Antigravity CLI, hoàn tất Audio DSP / Edit-Point Transition Nodes và xóa sạch panel `Effects` & `Effect Controls` cũ của FilmCraft.
 
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-25 (Tách Lõi L0, Nối Cầu Node Graph ⇄ Timeline/Render, Sửa 27 Blend Modes, Chống Ghi Đè Clip Khi Tạo FX Mới & Hoạch Định Preset/Keyframe):**
+  - Tách crate thuần dữ liệu `crates/node-graph-core` (Layer 0, không `egui`) và nối cầu `NodeGraphDoc` xuống `TrackItem`, `crates/engine` (`nodeGraph.*`), `crates/render` (`node_graph.rs` + phân tách module `crates/render/src/nodes/`) và `crates/gpu/src/custom_wgsl.rs`.
+  - Tái thiết kế UI controls theo chiều dọc gọn (`node_controls.rs`), tích hợp Color Picker trên `ColorGrade` (`tint_color`, `tint_amount`), mở rộng đủ 27 chế độ `BlendMode` + bổ sung `ComboBox` cho `Blend`, `ShapeGenerator`, `AudioReactor`, `ActionNode`.
+  - Khắc phục triệt để lỗi live-sync ghi đè nhầm FX Clip cũ khi `Load Preset` / `Clear All` / `Reset` bằng `detach_to_scratchpad()`, thêm nút `📝 New Graph (Nháp)` và đổi `⛓ Gỡ` ➔ `🗑 Gỡ khỏi Clip` (`node_graph_bridge.rs`).
+  - Bổ sung hệ thống **Keyframe & `KeyframeCurve` Node** vào Phase 4, lộ trình **Thư viện Preset `.preset.json` (Task 3.12)** và kế hoạch **thay thế ➔ xóa sạch `Effects` / `Effect Controls` FilmCraft (Phase 4–5)** kèm Feature Map kiểm thử `DW-06..08` tại `darkworks_node_presets_keyframes_migration.md`.
+  - Toàn workspace pass `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo xtask layers`, và `audit.py` (`0` vi phạm `< 700` dòng).
 
 - **2026-11-24 (Hoàn Thiện 100% Bộ Công Cụ Visual Group UX: Inline Rename, Context Menu, Rã Nhóm `Ctrl+Shift+G`, Auto-Fit & Lock Mode):**
   - Tích hợp Inline Rename: Nhấp đúp vào Header Bar hoặc bấm phím tắt `F2` để gõ đổi tên trực tiếp trên Canvas (Enter lưu, Esc hủy).

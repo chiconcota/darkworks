@@ -15,6 +15,7 @@ use egui_snarl::{
 };
 use std::sync::{Arc, Mutex};
 
+use crate::panels::node_graph_bridge;
 use crate::panels::node_graph_groups::{self, GroupMenuAction};
 use crate::panels::node_graph_menus;
 use crate::FilmcraftApp;
@@ -40,6 +41,10 @@ pub struct NodeGraphState {
     pub is_dragging_group: bool,
     pub last_snarl_id: Option<egui::Id>,
     pub history: GraphHistory,
+    pub bound_clip_id: Option<filmcraft_engine::project::ClipId>,
+    pub bound_clip_name: String,
+    pub last_synced_doc: Option<darkworks_node_graph_core::NodeGraphDoc>,
+    pub last_observed_selection: Option<filmcraft_engine::project::ClipId>,
 }
 
 impl NodeGraphState {
@@ -62,6 +67,13 @@ impl NodeGraphState {
         self.custom_titles = snap.custom_titles;
         self.selected_group = None;
         self.last_hovered_group = None;
+    }
+
+    /// Tách editor khỏi Clip đang gắn sang chế độ Nháp mà không làm mất Node Graph trên Clip cũ.
+    pub fn detach_to_scratchpad(&mut self) {
+        self.bound_clip_id = None;
+        self.bound_clip_name.clear();
+        self.last_synced_doc = None;
     }
 }
 
@@ -87,6 +99,10 @@ impl Default for NodeGraphState {
             is_dragging_group: false,
             last_snarl_id: None,
             history: GraphHistory::new(50),
+            bound_clip_id: None,
+            bound_clip_name: String::new(),
+            last_synced_doc: None,
+            last_observed_selection: None,
         }
     }
 }
@@ -205,10 +221,12 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
         return;
     };
     let state = &mut *state_guard;
+    node_graph_bridge::sync_selection_from_timeline(app, state);
 
     // 1. THANH CÔNG CỤ TRÊN CÙNG (TOOLBAR)
     ui.horizontal_wrapped(|ui| {
         ui.label(egui::RichText::new("🌟 Node Graph").strong().color(Color32::from_rgb(0, 210, 255)));
+        node_graph_bridge::render_timeline_actions(app, ui, state);
         ui.separator();
 
         // Menu Thêm Node & Load Preset
@@ -263,7 +281,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
 
         if ui.button("🔄 Reset").clicked() {
             state.push_undo();
-            *state = NodeGraphState::default();
+            let (snarl, groups) = NodeGraphPreset::load_builtin(BuiltinPresetKind::NewsTickerBanner);
+            state.snarl = snarl;
+            state.groups = groups;
+            state.custom_titles.clear();
+            state.selected_group = None;
+            state.last_hovered_group = None;
+            state.detach_to_scratchpad();
+            state.status_message = "Đã đặt lại Preset mặc định (chế độ Nháp)".to_string();
         }
 
         if ui.button("🗑 Clear All").clicked() {
@@ -271,7 +296,10 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
             state.snarl = Snarl::new();
             state.groups.clear();
             state.custom_titles.clear();
-            state.status_message = "Đã dọn sạch đồ thị".to_string();
+            state.selected_group = None;
+            state.last_hovered_group = None;
+            state.detach_to_scratchpad();
+            state.status_message = "Đã dọn sạch đồ thị (chế độ Nháp)".to_string();
         }
 
         ui.separator();
@@ -590,4 +618,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
         snarl_id,
         ui.ctx(),
     );
+
+    // 4. THỰC THI ACTION NODE & ĐỒNG BỘ LIVE XUỐNG TIMELINE
+    node_graph_bridge::process_action_nodes_and_live_sync(app, ui, state);
 }

@@ -65,6 +65,7 @@ mod view;
 
 pub use item::{AudioChannelMap, Bin, BinEntry, Interpretation, ItemKind, MediaClip, MediaIdentity, MediaRef, ProjectItem};
 pub use label::Label;
+pub use darkworks_node_graph_core as node_graph;
 pub(crate) use sequence::bounded_time_range;
 pub use sequence::{
     MAX_FRAME_PIXELS, MAX_FRAME_SIDE, MAX_PIXEL_ASPECT, Sequence, SequenceSettings, SplitMarks, checked_par, conformed_size, par_ratio, sane_par,
@@ -495,6 +496,7 @@ impl Project {
             source_channels,
             audio_stream: 0,
             graphic: source_graphic.and_then(|sg| sg.meta.map(Box::new)),
+            node_graph: None,
         })
     }
 

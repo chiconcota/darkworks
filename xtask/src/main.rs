@@ -32,6 +32,7 @@ use serde_json::Value;
 /// (crate name without the `filmcraft-` prefix, layer).
 const LAYERS: &[(&str, u8)] = &[
     ("testkit", 0),
+    ("darkworks-node-graph-core", 0),
     ("time", 0),
     ("geom", 0),
     ("color", 0),
@@ -72,13 +73,18 @@ const LAYERS: &[(&str, u8)] = &[
     ("platform", 5),
     ("ui-egui", 5),
     ("automation", 5),
+    ("darkworks-node-graph", 5),
+    ("egui-snarl", 5),
+    ("egui-scale", 5),
     ("filmcraft", 6),
+    ("darkworks", 6),
     ("cli", 6),
+    ("darkworks-cli", 6),
     ("web", 6),
 ];
 
 /// L0 crates that are not codecs/containers (no `bitstream`-only restriction).
-const L0_FOUNDATION: &[&str] = &["time", "geom", "color", "bitstream", "testkit"];
+const L0_FOUNDATION: &[&str] = &["time", "geom", "color", "bitstream", "testkit", "darkworks-node-graph-core"];
 
 /// Allowed same-layer edges (from, to).
 const SAME_LAYER: &[(&str, &str)] = &[

@@ -14,6 +14,7 @@ filmcraft-time = { workspace = true }
 filmcraft-geom = { workspace = true }
 filmcraft-color = { workspace = true }
 filmcraft-media = { workspace = true }
+darkworks-node-graph-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 url = { workspace = true }

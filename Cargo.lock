@@ -1674,8 +1674,18 @@ dependencies = [
 name = "darkworks-node-graph"
 version = "0.1.0"
 dependencies = [
+ "darkworks-node-graph-core",
  "egui",
  "egui-snarl",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "darkworks-node-graph-core"
+version = "0.1.0"
+dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -2435,6 +2445,7 @@ dependencies = [
  "chrono",
  "craft-docpath",
  "craft-media 0.1.0 (git+https://github.com/storytold/craft-libs?rev=82062077bba679ba5236e2d1a391f02d1533cbab)",
+ "darkworks-node-graph-core",
  "filmcraft-audio-dsp",
  "filmcraft-captions",
  "filmcraft-codecs",
@@ -2660,6 +2671,7 @@ dependencies = [
 name = "filmcraft-project"
 version = "0.1.0"
 dependencies = [
+ "darkworks-node-graph-core",
  "filmcraft-color",
  "filmcraft-geom",
  "filmcraft-media",
@@ -2675,6 +2687,7 @@ dependencies = [
 name = "filmcraft-render"
 version = "0.1.0"
 dependencies = [
+ "darkworks-node-graph-core",
  "filmcraft-audio-dsp",
  "filmcraft-captions",
  "filmcraft-color",
@@ -2779,6 +2792,7 @@ dependencies = [
  "cpu-time",
  "craft-ui",
  "darkworks-node-graph",
+ "darkworks-node-graph-core",
  "eframe",
  "egui",
  "egui-snarl",

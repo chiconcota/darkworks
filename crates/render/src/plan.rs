@@ -253,7 +253,7 @@ fn simple_transition(id: &str) -> bool {
 /// with effects off). None: the clip is rendered on the CPU.
 fn gpu_chain<'a>(project: &Project, item: &'a TrackItem, opts: RenderOptions) -> Option<Vec<&'a filmcraft_project::EffectInstance>> {
     let is_media = project.item(item.item).is_some_and(|p| matches!(p.kind, ItemKind::Media(_) | ItemKind::Subclip { .. }));
-    if !is_media || item.has_opacity_masks() {
+    if !is_media || item.has_opacity_masks() || (opts.effects && item.node_graph.is_some()) {
         return None;
     }
     if !opts.effects {
@@ -379,10 +379,13 @@ pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick, scale: f32,
         }
         if let Some(it) = tr.item_at(t)
             && it.enabled
-            && adjustment(it)
-            && adjustment_ops(project, seq, it, t, scale, caps).is_none()
         {
-            return false;
+            if it.node_graph.is_some() {
+                return false;
+            }
+            if adjustment(it) && adjustment_ops(project, seq, it, t, scale, caps).is_none() {
+                return false;
+            }
         }
     }
     true

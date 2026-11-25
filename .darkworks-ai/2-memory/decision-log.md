@@ -332,3 +332,24 @@
   2. **Chuẩn hóa ID với `SnarlWidget::new().id(...)`:** Đảm bảo `snarl_canvas_id` cố định nhất quán 100% giữa lúc render và lúc đọc danh sách chọn.
   3. **Bắt trọn `Ctrl + Delete` & `consume_key`:** Tiêu thụ chính xác các sự kiện phím trong cả `keys.rs` và `node_graph.rs`, ngăn ngừa hiện tượng lặp phím.
   4. **Xóa vùng chọn sau khi xóa:** Gọi `egui_snarl::ui::deselect_all_nodes` để làm sạch trạng thái chọn. Nút `↶ Undo` lập tức sáng đèn và `Ctrl + Z` hồi phục đầy đủ node cùng dây nối.
+
+### 36. Tách Lõi `darkworks-node-graph-core` (L0) & Nối Cầu Node Graph ➔ Timeline / Compositor (2026-11-25)
+- **Bối cảnh & Ràng buộc:** `xtask layers` cấm mọi crate tầng L0–L4 (`project`, `render`, `gpu`, `engine`) phụ thuộc vào `egui`. Trong khi đó `darkworks-node-graph` kéo `egui` và `egui-snarl`, nên chưa thể gắn Node Graph xuống `TrackItem` hay thực thi trong `crates/render`.
+- **Quyết định kiến trúc:**
+  1. **Tách crate `crates/node-graph-core` (L0):** Chứa mô hình thuần dữ liệu `NodeGraphDoc`, `DarkNode`, `DagEvaluator`, `WgslParser` (chỉ phụ thuộc `serde`, `serde_json`, `thiserror`). `crates/node-graph` (L5) cung cấp cầu nối 2 chiều `doc_from_snarl` / `snarl_from_doc`.
+  2. **Lưu trữ trong `TrackItem` & Lệnh `Session::execute`:** Thêm `pub node_graph: Option<Box<NodeGraphDoc>>` vào `TrackItem` (`crates/project`); bổ sung các lệnh `nodeGraph.{setOnClip, createOverlayClip, applyScope, clearFromClip, getFromClip}` (`crates/engine`) ăn theo `Arc<Project>` Undo/Redo và `project.json`.
+  3. **DAG Compositor & `CustomWgsl` GPU:** `crates/render/src/node_graph.rs` (+ `node_graph_ops.rs`) đánh giá đồ thị theo frame tại `Tick` hiện tại (hỗ trợ cả media clips và adjustment/overlay layers, trích xuất RMS/band cho `AudioReactor`), kết hợp `crates/gpu/src/custom_wgsl.rs` chạy fragment shader an toàn qua `push_error_scope`.
+  4. **Đồng bộ UI (`node_graph_bridge.rs` & `timeline/clips.rs`):** Thêm nút `📌 Apply to Clip`, `🎬 Add as FX Clip`, `⛓ Gỡ`, kích hoạt `[ ▶ RUN WORKFLOW ]` trên `ActionNode`, live sync khi nhả chuột và vẽ badge `◈` Cyan trên clip Timeline.
+
+### 37. Bổ Sung Hệ Thống Keyframe & `KeyframeCurve` Node Vào Giai Đoạn 4 (2026-11-25)
+- **Bối cảnh:** Giai đoạn 3 mới triển khai chuyển động procedural (`TimeDriver` + `AudioReactor`), chưa có keyframe theo mốc thời gian cho Node Graph. Tuy nhiên khi dựng motion graphics thực tế vẫn cần điều khiển chính xác theo từng mốc `Tick` (Ease-In/Out, giữ yên, trượt vào/ra).
+- **Quyết định của Giám Đốc:** Bổ sung hạng mục Keyframe vào **Giai đoạn 4 (Phase 4)** song song với Vello Canvas 2D Node, gồm 2 lớp:
+  1. **Keyframe trực tiếp trên tham số của `DarkNode`:** Đặt/xóa/nhảy mốc `◀ ◆ ▶` theo Playhead (`Tick`), hỗ trợ `Hold`, `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` / Cubic Bezier, lưu tương thích ngược bằng `#[serde(default)]`.
+  2. **Node `KeyframeCurve` (Spline Signal):** Xuất tín hiệu `Scalar` để 1 đường cong keyframe điều khiển đồng bộ nhiều Node qua socket `Mod`, đồng thời kết hợp được với `TimeDriver` và `AudioReactor` và đóng gói vào `.preset.json`.
+
+### 38. Lộ Trình Thay Thế 100% `Effects` & `Effect Controls` FilmCraft Bằng Node Graph + Kho Preset `.preset.json` (2026-11-25)
+- **Mục tiêu:** Thay toàn bộ hiệu ứng cũ của FilmCraft bằng Node Graph + Thư viện `.preset.json` lưu sẵn, sau đó xóa hẳn UI `Effects` và `Effect Controls` cũ khỏi Darkworks.
+- **Lộ trình an toàn 3 bước (không làm mất tính năng giữa chừng):**
+  1. **Phase 3 (Task 3.8 / 3.12):** Nâng cấp Export/Import file `.preset.json` thật theo `NodeGraphDoc` (đầy đủ `nodes`, `pos`, `wires`, `groups`) + Thư mục User Presets dùng 1-click (hỗ trợ Replace/Chain).
+  2. **Phase 4 (Task 4.7):** Xong Keyframe Node Graph + nối Transform Handles trên Program Monitor vào `Transform2D` + đóng gói các Video/Color Presets ➔ **Ẩn** `Effect Controls` và `Video Effects` cũ khỏi UI mặc định.
+  3. **Phase 5 (Task 5.5):** Bổ sung Audio DSP Nodes & Edit-Point Transition Bridge trên Timeline ➔ **Xóa sạch** `PanelKind::Effects` và `PanelKind::EffectControls` cũ khỏi giao diện Darkworks.

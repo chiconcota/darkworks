@@ -548,6 +548,7 @@ impl Builder {
             source_channels: Vec::new(),
             audio_stream: 0,
             graphic: None,
+            node_graph: None,
         }
     }
 

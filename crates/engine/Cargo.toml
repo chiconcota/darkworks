@@ -24,6 +24,7 @@ filmcraft-geom = { workspace = true }
 filmcraft-color = { workspace = true }
 filmcraft-frame = { workspace = true }
 filmcraft-media = { workspace = true }
+darkworks-node-graph-core = { workspace = true }
 craft-media = { workspace = true, features = ["mxf"] }
 filmcraft-codecs = { workspace = true }
 filmcraft-project = { workspace = true }
