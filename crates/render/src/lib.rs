@@ -311,13 +311,17 @@ fn seq_canvas(project: &Project, seq: &Sequence, t: Tick, opts: RenderOptions, s
             }
             continue;
         }
-        if opts.effects && item.node_graph.is_some() {
+        if opts.effects && let Some(doc) = item.node_graph.as_deref() {
             let clip_img = item_layer_ex(project, seq, item, t, opts, sources, LayerWant { tc: &tc, allow_region: false })
                 .map(|l| l.into_full(w, h).0);
-            let below = canvas.snapshot();
-            if let Some(img) = node_graph::eval_item_graph(project, seq, item, t, opts, sources, clip_img.as_ref(), Some(&below)) {
-                blend::composite(canvas.get(), &img, 1.0, Blend::Normal);
-                pool::recycle_f32(img.px);
+            let below = nodes::graph_needs_below(doc).then(|| canvas.snapshot());
+            if let Some(img) = node_graph::eval_item_graph(project, seq, item, t, opts, sources, clip_img.as_ref(), below.as_ref()) {
+                if nodes::graph_replaces_below(doc) {
+                    canvas.set(img);
+                } else {
+                    blend::composite(canvas.get(), &img, 1.0, Blend::Normal);
+                    pool::recycle_f32(img.px);
+                }
                 continue;
             }
         }

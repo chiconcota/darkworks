@@ -1,8 +1,5 @@
 //! Xử lý chỉnh màu & tách phông cho `ColorGrade` và `Keyer` Nodes.
 
-use filmcraft_color::srgb_to_linear;
-use rayon::prelude::*;
-
 use crate::gpufx::FxOp;
 use crate::image::Image;
 
@@ -81,9 +78,13 @@ pub(crate) fn apply_color_grade(img: &mut Image, p: &ColorGradeParams) {
         }
         .apply(img);
     } else {
-        if p.exposure.abs() > 1e-4 || (p.contrast - 1.0).abs() > 1e-4 || (p.saturation - 1.0).abs() > 1e-4 {
+        if p.exposure.abs() > 1e-4 {
+            let gain = 2.0_f32.powf(p.exposure.clamp(-5.0, 5.0));
+            img.map_rgb(|c, _, _| [c[0] * gain, c[1] * gain, c[2] * gain]);
+        }
+        if (p.contrast - 1.0).abs() > 1e-4 || (p.saturation - 1.0).abs() > 1e-4 {
             FxOp::ProcAmp {
-                br: p.exposure * 0.25,
+                br: 0.0,
                 co: p.contrast.max(0.0),
                 hue: 0.0,
                 sat: p.saturation.max(0.0),
@@ -123,34 +124,11 @@ pub(crate) fn apply_keyer(
     smoothness: f32,
     spill_suppress: f32,
 ) {
-    let key_lin = [
-        srgb_to_linear(key_color[0]),
-        srgb_to_linear(key_color[1]),
-        srgb_to_linear(key_color[2]),
-    ];
-    let sim = similarity.max(0.01);
-    let sm = smoothness.max(0.01);
-    img.px.par_chunks_mut(4).for_each(|p| {
-        let a = p[3];
-        if a <= 0.0 {
-            return;
-        }
-        let rgb = [p[0] / a, p[1] / a, p[2] / a];
-        let dist = ((rgb[0] - key_lin[0]).powi(2)
-            + (rgb[1] - key_lin[1]).powi(2)
-            + (rgb[2] - key_lin[2]).powi(2))
-        .sqrt();
-        let matte = ((dist - sim) / sm).clamp(0.0, 1.0);
-        let na = a * matte;
-        let g = if spill_suppress > 0.0 {
-            let max_rb = rgb[0].max(rgb[2]);
-            rgb[1] - (rgb[1] - max_rb).max(0.0) * spill_suppress.clamp(0.0, 1.0)
-        } else {
-            rgb[1]
-        };
-        p[0] = rgb[0] * na;
-        p[1] = g * na;
-        p[2] = rgb[2] * na;
-        p[3] = na;
-    });
+    FxOp::ChromaKey {
+        key_color,
+        similarity,
+        smoothness,
+        spill_suppress,
+    }
+    .apply(img);
 }

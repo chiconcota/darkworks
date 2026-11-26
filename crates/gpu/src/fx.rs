@@ -57,6 +57,7 @@ const OP_BOKEH_BOOST: u32 = 33;
 const OP_BOKEH: u32 = 34;
 const OP_BOKEH_UP: u32 = 35;
 const OP_THREE_WAY: u32 = 36;
+const OP_CHROMA_KEY: u32 = 37;
 
 type Target = (wgpu::Texture, wgpu::TextureView);
 
@@ -320,6 +321,27 @@ fn steps(op: &FxOp, w: u32, h: u32) -> Vec<Step> {
                 0.0,
             ];
             out.push(step(OP_LUMETRI, [*creative_on as u32, *vignette_on as u32, 0, 0], &p));
+        }
+        FxOp::ChromaKey { key_color, similarity, smoothness, spill_suppress } => {
+            let dom = if key_color[1] >= key_color[0] && key_color[1] >= key_color[2] {
+                1u32
+            } else if key_color[2] >= key_color[0] {
+                2u32
+            } else {
+                0u32
+            };
+            let kr = 0.2126f32;
+            let kb = 0.0722f32;
+            let kg = 1.0 - kr - kb;
+            let ky = kr * key_color[0] + kg * key_color[1] + kb * key_color[2];
+            let kcb = (key_color[2] - ky) / (2.0 * (1.0 - kb));
+            let kcr = (key_color[0] - ky) / (2.0 * (1.0 - kr));
+            let kmag2 = (kcb * kcb + kcr * kcr).max(1e-6);
+            let tol = 0.08 + smoothness.clamp(0.0, 1.0) * 0.50;
+            let gain = 1.0 + 2.0 * similarity.clamp(0.0, 1.0);
+            let pedestal = (similarity.clamp(0.0, 1.0) * 0.25).min(0.85);
+            let spill = spill_suppress.clamp(0.0, 1.0);
+            out.push(step(OP_CHROMA_KEY, [dom, 0, 0, 0], &[kcb, kcr, kmag2, tol, gain, pedestal, spill]));
         }
     }
     out

@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (đã nâng cấp Nhóm A: Lumetri `ColorGrade`, `BlurSharpen`, `DistortLens`, `Shape`/`Text`+Font ComboBox, `Transition`, `VideoInput` V1/V2, `AudioReactor` A1/A2), Kho Preset `.preset.json` thật + Replace/Chain. | Điều tra lỗi `Audio Reactor` + kiểm tra các node còn lại + UI **Node & Preset Library Browser** (`Task 3.13`). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (`ColorGrade`, `BlurSharpen` 6 kiểu, `DistortLens` 13 kiểu lọc UI, `Keyer` GPU `OP_CHROMA_KEY`, `Reroute` đa kiểu, `CustomWgsl`), `gpu_plan.rs` chạy GPU tuyến tính, Kho Preset `.preset.json`. | Hoàn thiện `Ultra Keyer` Pro ([ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md)) & **Node & Preset Library Browser** (`Task 3.13`). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -123,6 +123,12 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-26 (GPU `OP_CHROMA_KEY`, Biên Dịch `gpu_plan.rs`, Nâng Cấp `BlurSharpen`/`DistortLens` & Lập Kế Hoạch `Ultra Keyer` Pro):**
+  - Sửa lỗi `AudioReactor` + `ColorGrade` (`Exp` linear stops + `Exp Mod * 2.5`), Preset 4 (`AudioBeatFlash`), thêm `DataType` trên `Reroute`, snippet `fn fs_main` trên `CustomWgsl`, và kiểm tra tương thích kiểu khi nối dây (`viewer::connect`).
+  - Nâng cấp `BlurSharpen` (`dimensions`, `repeat_edge`, `bokeh_sides`, `RadialZoom`) và `DistortLens` (`Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace` + UI tự ẩn ô thừa), tách `crates/node-graph/src/node_controls_fx.rs`.
+  - Triển khai `FxOp::ChromaKey` (`OP_CHROMA_KEY = 37`) trong `fx.wgsl` / `fx.rs` / `gpufx.rs` (Y'CbCr Bt.709 + 1px neighbor choke kẹp biên + spill suppression) và thêm `crates/render/src/nodes/gpu_plan.rs` đưa nhánh tuyến tính `Apply to Clip` lên 100% GPU `LayerFx` (hết lag CPU 87% khi phát `V1` 4K + `V2` green screen). Tối ưu fallback CPU (`take_or_clone_texture`, `recycle_f32`) và tách `node_graph_tests.rs` giữ `node_graph.rs` còn 416 dòng.
+  - Lập kế hoạch chuyên biệt hoàn thiện `Ultra Keyer` cho phiên sau tại [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md).
 
 - **2026-11-25 (Ca 2 — Kho Preset `.preset.json` Thật, Nâng Cấp Nhóm A Atomic Nodes & Sửa Lỗi UI/Track Input):**
   - Triển khai `NodeGraphPresetDoc` & `chain_node_graphs` (`crates/node-graph-core/src/preset.rs`), hộp thoại `💾 Save Preset` (lưu vào `<data_dir>/Node Presets/` dùng chung mọi project), `💾 Export .preset.json`, `📥 Import Preset` (chế độ Nháp) và chế độ áp **Thay thế / Nối tiếp (Chain)** tại `crates/ui-egui/src/panels/node_graph_presets.rs`.

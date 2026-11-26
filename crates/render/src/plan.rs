@@ -253,8 +253,11 @@ fn simple_transition(id: &str) -> bool {
 /// with effects off). None: the clip is rendered on the CPU.
 fn gpu_chain<'a>(project: &Project, item: &'a TrackItem, opts: RenderOptions) -> Option<Vec<&'a filmcraft_project::EffectInstance>> {
     let is_media = project.item(item.item).is_some_and(|p| matches!(p.kind, ItemKind::Media(_) | ItemKind::Subclip { .. }));
-    if !is_media || item.has_opacity_masks() || (opts.effects && item.node_graph.is_some()) {
+    if !is_media || item.has_opacity_masks() {
         return None;
+    }
+    if opts.effects && item.node_graph.is_some() {
+        return Some(Vec::new());
     }
     if !opts.effects {
         return Some(Vec::new());
@@ -380,7 +383,7 @@ pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick, scale: f32,
         if let Some(it) = tr.item_at(t)
             && it.enabled
         {
-            if it.node_graph.is_some() {
+            if it.node_graph.as_deref().is_some_and(|d| adjustment(it) || crate::nodes::graph_needs_below(d)) {
                 return false;
             }
             if adjustment(it) && adjustment_ops(project, seq, it, t, scale, caps).is_none() {
@@ -598,7 +601,8 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
         let input = if crate::colorman::needs_management(pipe, cs, &frame) { crate::colorman::gpu_input(project, item.item, pipe, cs, &frame) } else { None };
         let plain = (input.is_some() || !crate::colorman::needs_management(pipe, cs, &frame))
             && crate::media_interpolation(item, t, &src, seq.settings.frame_rate).is_none();
-        if plain && !chain.is_empty() {
+        let has_graph = opts.effects && item.node_graph.is_some();
+        if plain && (!chain.is_empty() || has_graph) {
             // GPU effect stage: the working image the CPU would decode (`base_layer`), the
             // effects evaluated for it, placed as `item_layer` places it
             let (fw, fh) = upright(&frame);
@@ -619,7 +623,13 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
                 frame_rate: seq.settings.frame_rate.as_f64(),
                 working: seq.settings.color.working,
             };
-            let ops: Option<Vec<FxOp>> = chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect();
+            let ops: Option<Vec<FxOp>> = if has_graph
+                && let Some(doc) = item.node_graph.as_deref()
+            {
+                crate::nodes::eval_graph_to_fx_ops(project, seq, item, doc, t, opts, lw, lh, px_scale, sources)
+            } else {
+                chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect()
+            };
             if let Some(ops) = ops {
                 let m = Affine::scale(opts.scale as f64, opts.scale as f64)
                     .then_apply(&motion)
@@ -628,7 +638,8 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
                 out.push(PlanLayer { frame, matrix: m, opacity: op * extra_opacity, blend: bl, fx: Some(Arc::new(fx)), input });
                 return;
             }
-        } else if plain {
+        }
+        if plain && !has_graph {
             // Draft playback at reduced resolution: hand over planes box-filtered to the size
             // drawn instead of the full picture (a quarter at 1/2, a sixteenth at 1/4 of the
             // upload and sampling). The mean is taken over Y'CbCr codes, not linear light as
@@ -647,8 +658,17 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
             return;
         }
     }
-    // CPU-rendered layer (standard effects): drawn by the GPU as a pre-rendered canvas image.
+    // CPU-rendered layer (standard effects or multi-branch node graph): drawn by the GPU as a pre-rendered canvas image.
     let tc = filmcraft_time::format_time(t, seq.settings.frame_rate, seq.settings.drop_frame, filmcraft_time::TimeDisplay::Timecode, 48_000);
+    if opts.effects && item.node_graph.is_some() {
+        let (w, h) = output_size(seq, opts.scale);
+        let clip_img = crate::item_layer_ex(project, seq, item, t, opts, sources, crate::LayerWant { tc: &tc, allow_region: false })
+            .map(|l| l.into_full(w, h).0);
+        if let Some(img) = crate::node_graph::eval_item_graph(project, seq, item, t, opts, sources, clip_img.as_ref(), None) {
+            out.push(PlanLayer::new(cpu_frame(img), Affine::IDENTITY, extra_opacity, Blend::Normal));
+            return;
+        }
+    }
     if let Some((img, op2, _)) = crate::item_layer(project, seq, item, t, opts, sources, &tc) {
         out.push(PlanLayer::new(cpu_frame(img), Affine::IDENTITY, op2 * extra_opacity, bl));
     }

@@ -13,6 +13,7 @@ pub mod group;
 pub mod history;
 pub mod node;
 pub mod node_controls;
+mod node_controls_fx;
 pub mod preset;
 pub mod types;
 pub mod viewer;
@@ -28,8 +29,8 @@ pub use evaluator::{DagError, DagEvaluator, DagExecutionPlan, DagStep, Evaluatio
 pub use group::VisualGroup;
 pub use history::{GraphHistory, GraphSnapshot};
 pub use node::{
-    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TextAlign,
-    TimeMode, TransitionDirection, TransitionType,
+    ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,
+    ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
 };
 pub use preset::{BuiltinPresetKind, NodeGraphPreset, PresetError};
 pub use types::{NodeDataType, pin_color32};

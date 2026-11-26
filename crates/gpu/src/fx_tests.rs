@@ -249,6 +249,17 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, ParamValue)>, bool)> {
         ("color_replace", vec![("similarity", fl(40.0))], true),
         ("color_replace", vec![("similarity", fl(25.0)), ("solid", ParamValue::Bool(true)), ("target", col(0.3, 0.6, 0.2))], true),
         ("color_replace", vec![("similarity", fl(0.0))], true),
+        ("ultra_key", vec![], true),
+        (
+            "ultra_key",
+            vec![
+                ("key_color", col(0.1, 0.85, 0.15)),
+                ("transparency", fl(60.0)),
+                ("tolerance", fl(35.0)),
+                ("spill", fl(90.0)),
+            ],
+            true,
+        ),
         ("alpha_adjust", vec![("opacity", fl(60.0))], false),
         ("alpha_adjust", vec![("ignore", ParamValue::Bool(true)), ("invert", ParamValue::Bool(true))], false),
         ("alpha_adjust", vec![("invert", ParamValue::Bool(true)), ("mask_only", ParamValue::Bool(true)), ("opacity", fl(150.0))], false),

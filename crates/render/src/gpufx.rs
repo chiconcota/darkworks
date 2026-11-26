@@ -219,6 +219,12 @@ pub enum FxOp {
         aspect: f32,
         gpu_capable: bool,
     },
+    ChromaKey {
+        key_color: [f32; 3],
+        similarity: f32,
+        smoothness: f32,
+        spill_suppress: f32,
+    },
 }
 
 /// Effect ids [`FxOp::eval`] understands (the GPU-capable standard effects).
@@ -259,6 +265,7 @@ pub const GPU_EFFECTS: &[&str] = &[
     "vignette",
     "video_limiter",
     "lumetri",
+    "ultra_key",
 ];
 
 /// `Image::transformed` without the mip path: the destination rectangle it writes and the inverse.
@@ -465,6 +472,30 @@ impl FxOp {
             "edge_feather" => {
                 let amt = f(e, "amount", cx) / 100.0 * (w.min(h) as f32) * 0.5;
                 FxOp::crop_rect(w, h, 0.0, 0.0, 0.0, 0.0, amt)
+            }
+            "ultra_key" => {
+                if choice(e, "output") != 0 {
+                    return None;
+                }
+                let kc = color(e, "key_color", cx);
+                let setting = choice(e, "setting");
+                let preset = filmcraft_project::effect::ultra_key_setting(setting);
+                let pf = |id: &str, fallback: f32| {
+                    preset.and_then(|rows| rows.iter().find(|(k, _)| *k == id).map(|(_, v)| *v as f32)).unwrap_or(fallback)
+                };
+                if pf("soften", f(e, "soften", cx)) > 0.0
+                    || (f(e, "cc_saturation", cx) - 100.0).abs() > 1e-3
+                    || f(e, "cc_hue", cx).abs() > 1e-4
+                    || (f(e, "cc_luminance", cx) - 100.0).abs() > 1e-3
+                {
+                    return None;
+                }
+                FxOp::ChromaKey {
+                    key_color: [kc[0], kc[1], kc[2]],
+                    similarity: (pf("transparency", f(e, "transparency", cx)) / 100.0).clamp(0.0, 1.0),
+                    smoothness: (pf("tolerance", f(e, "tolerance", cx)) / 100.0).clamp(0.0, 1.0),
+                    spill_suppress: (pf("spill", f(e, "spill", cx)) / 100.0).clamp(0.0, 1.0),
+                }
             }
             "transform" => {
                 // With its own shutter angle the CPU blurs the motion over seven samples
@@ -713,6 +744,9 @@ impl FxOp {
                     && fin(st)
                     && fin(ht)
                     && fin(&[*va, *vmid, *vround, *vfeather, *aspect])
+            }
+            FxOp::ChromaKey { key_color, similarity, smoothness, spill_suppress } => {
+                fin(key_color) && fin(&[*similarity, *smoothness, *spill_suppress])
             }
         }
     }
@@ -1123,8 +1157,84 @@ impl FxOp {
                     dec(v)
                 });
             }
+            FxOp::ChromaKey { key_color, similarity, smoothness, spill_suppress } => {
+                chroma_key_cpu(img, *key_color, *similarity, *smoothness, *spill_suppress);
+            }
         }
     }
+}
+
+fn chroma_key_matte(px: [f32; 4], k_cbcr: [f32; 2], kmag2: f32, tol: f32, gain: f32, pedestal: f32) -> f32 {
+    let a = px[3];
+    if a <= 1e-6 {
+        return 0.0;
+    }
+    let v = enc([px[0] / a, px[1] / a, px[2] / a]);
+    let ycc = filmcraft_color::rgb_to_ycbcr(v[0], v[1], v[2], filmcraft_color::Matrix::Bt709);
+    let proj = (ycc[1] * k_cbcr[0] + ycc[2] * k_cbcr[1]) / kmag2;
+    let d_cb = ycc[1] - proj * k_cbcr[0];
+    let d_cr = ycc[2] - proj * k_cbcr[1];
+    let perp = (d_cb * d_cb + d_cr * d_cr).sqrt() / kmag2.sqrt();
+    let t = (perp / tol.max(1e-5)).clamp(0.0, 1.0);
+    let smooth = t * t * (3.0 - 2.0 * t);
+    let keyness = proj.clamp(0.0, 1.5) * (1.0 - smooth);
+    let m = (1.0 - keyness * gain).clamp(0.0, 1.0);
+    ((m - pedestal) / (1.0 - pedestal)).clamp(0.0, 1.0)
+}
+
+fn chroma_key_cpu(img: &mut Image, key_color: [f32; 3], similarity: f32, smoothness: f32, spill_suppress: f32) {
+    let k = filmcraft_color::rgb_to_ycbcr(key_color[0], key_color[1], key_color[2], filmcraft_color::Matrix::Bt709);
+    let kmag2 = (k[1] * k[1] + k[2] * k[2]).max(1e-6);
+    let tol = 0.08 + smoothness.clamp(0.0, 1.0) * 0.50;
+    let gain = 1.0 + 2.0 * similarity.clamp(0.0, 1.0);
+    let pedestal = (similarity.clamp(0.0, 1.0) * 0.25).min(0.85);
+    let spill = spill_suppress.clamp(0.0, 1.0);
+    let dom = if key_color[1] >= key_color[0] && key_color[1] >= key_color[2] {
+        1
+    } else if key_color[2] >= key_color[0] {
+        2
+    } else {
+        0
+    };
+    let (w, h) = (img.w, img.h);
+    let src = img.clone();
+    let k_cbcr = [k[1], k[2]];
+    img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
+        for x in 0..w {
+            let o = src.get(x, y);
+            if o[3] <= 1e-6 {
+                continue;
+            }
+            let mut a = chroma_key_matte(o, k_cbcr, kmag2, tol, gain, pedestal);
+            if a > 0.0 && a < 0.98 {
+                let mut nb_min = 1.0f32;
+                let (xm, ym) = (w.saturating_sub(1) as isize, h.saturating_sub(1) as isize);
+                for (dx, dy) in [(-1isize, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = (x as isize + dx).clamp(0, xm) as usize;
+                    let ny = (y as isize + dy).clamp(0, ym) as usize;
+                    nb_min = nb_min.min(chroma_key_matte(src.get(nx, ny), k_cbcr, kmag2, tol, gain, pedestal));
+                }
+                if nb_min < 0.05 {
+                    a = a.min(0.5 * (a + nb_min));
+                }
+            }
+            let mut v = enc([o[0] / o[3], o[1] / o[3], o[2] / o[3]]);
+            let (o1, o2) = (v[(dom + 1) % 3], v[(dom + 2) % 3]);
+            let limit = o1.max(o2);
+            let excess = (v[dom] - limit).max(0.0);
+            if excess > 0.0 && spill > 0.0 {
+                v[dom] -= excess * spill;
+                if a < 0.98 {
+                    let lm = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+                    let k_desat = (1.0 - a) * spill * 0.65;
+                    v = v.map(|q| q + (lm - q) * k_desat);
+                }
+            }
+            let l = dec(v);
+            let na = o[3] * a;
+            row[x * 4..x * 4 + 4].copy_from_slice(&[l[0] * na, l[1] * na, l[2] * na, na]);
+        }
+    });
 }
 
 /// Horizontal scale of the Color Grading vignette's coordinates for a Roundness of `vround`

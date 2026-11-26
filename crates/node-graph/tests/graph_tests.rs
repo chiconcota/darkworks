@@ -425,6 +425,10 @@ fn test_all_5_builtin_presets_validation() {
         // Đánh giá tín hiệu mẫu tại t=1.0s, RMS peak=0.75
         let ctx = DagEvaluator::evaluate_signals(&plan, 1.0, 0.75);
         assert!((ctx.timeline_time_sec - 1.0).abs() < 1e-5);
+        if kind == BuiltinPresetKind::AudioBeatFlash {
+            let has_audio_wire = snarl.wires().any(|(out_p, _)| matches!(snarl[out_p.node], DarkNode::AudioReactor { .. }));
+            assert!(has_audio_wire, "Preset AudioBeatFlash phải nối dây AudioReactor");
+        }
     }
 }
 

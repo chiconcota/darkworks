@@ -162,7 +162,7 @@ pub enum ActionScope {
     AllTracks,
 }
 
-/// 5 Thuật toán làm mờ và làm nét của `BlurSharpen` (Gom 5 Shader WGSL)
+/// Các thuật toán làm mờ và làm nét của `BlurSharpen`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlurType {
     Gaussian,
@@ -170,6 +170,16 @@ pub enum BlurType {
     Directional,
     BokehBloom,
     UnsharpMask,
+    RadialZoom,
+}
+
+/// Trục làm mờ cho `BlurSharpen` (`Gaussian` & `Box`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum BlurDimensions {
+    #[default]
+    Both,
+    Horizontal,
+    Vertical,
 }
 
 /// Thuật toán biến dạng & stylize của `DistortLens`
@@ -184,6 +194,10 @@ pub enum DistortType {
     Offset,
     Posterize,
     Pixelate,
+    Twirl,
+    TurbulentDisplace,
+    FindEdges,
+    NoiseGrain,
 }
 
 /// Thuật toán chuyển cảnh của `Transition`
@@ -207,6 +221,9 @@ fn default_neutral_split_tint() -> [f32; 3] {
 }
 fn default_one() -> f32 {
     1.0
+}
+fn default_true() -> bool {
+    true
 }
 fn default_blur_threshold() -> f32 {
     0.5
@@ -315,6 +332,14 @@ pub enum DarkNode {
         highlight_boost: f32,
         #[serde(default = "default_blur_threshold")]
         threshold: f32,
+        #[serde(default)]
+        dimensions: BlurDimensions,
+        #[serde(default = "default_true")]
+        repeat_edge: bool,
+        #[serde(default)]
+        bokeh_sides: u8,
+        #[serde(default)]
+        center: [f32; 2],
     },
     DistortLens {
         distort_type: DistortType,
@@ -482,6 +507,10 @@ impl DarkNode {
             angle_deg,
             highlight_boost,
             threshold: 0.5,
+            dimensions: BlurDimensions::Both,
+            repeat_edge: true,
+            bokeh_sides: 0,
+            center: [0.0, 0.0],
         }
     }
 

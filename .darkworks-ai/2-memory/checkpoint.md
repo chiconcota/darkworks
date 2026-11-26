@@ -1,6 +1,6 @@
 # SỔ BÀN GIAO TIẾN ĐỘ CA KÍP: DARKWORKS (checkpoint.md)
-@project: DARKWORKS | @phòng_ban: Toàn xưởng | @status: 🟡 Hoàn Thành Lưu/Xuất/Nhập `.preset.json` (Task 3.12) & Nâng Cấp Nhóm A Atomic Nodes — Còn Bug `Audio Reactor` & `Task 3.13`
-@session_end: 2026-11-25 (Ca 2) | @next_session_focus: Điều tra RCA lỗi `Audio Reactor`, kiểm tra các node còn lại (`CustomWgsl`, `Reroute`, `viewer::connect`), và triển khai Node & Preset Library Browser (`Task 3.13`)
+@project: DARKWORKS | @phòng_ban: Toàn xưởng | @status: 🟢 Sẵn Sàng Cho Phiên Nâng Cấp Chuyên Sâu `Ultra Keyer` Pro
+@session_end: 2026-11-26 | @next_session_focus: Triển khai toàn bộ kế hoạch [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md) (nâng cấp `DarkNode::Keyer` lên chuẩn Pro NLE 100% GPU)
 
 > Sổ ghi chép bàn giao công việc giữa các phiên làm việc của AI.  
 > Khi mở phiên mới (`/start_session`), nhân viên đọc file này để nắm tiến độ dở dang trong 3 giây.
@@ -8,51 +8,53 @@
 ---
 
 ## 1. THÔNG TIN NHÁNH GIT & TRẠNG THÁI HIỆN TẠI
-- **Nhánh Git:** `main` (đã commit toàn bộ thay đổi của phiên 2026-11-25).
-- **Môi trường:** Linux x86_64, Vulkan / VA-API, Pure Rust (`wgpu` + `egui` + `egui_snarl`).
+- **Nhánh Git:** `main` (`ahead 1`, có các thay đổi chưa commit của phiên 2026-11-26 — chờ ý kiến Người Dùng để commit/push).
+- **Môi trường:** Linux x86_64, Vulkan (`AMD Radeon Graphics RADV RENOIR`) / VA-API, Pure Rust (`wgpu` + `egui` + `egui_snarl`).
 - **Kết quả kiểm toán cuối phiên (PASS 100%):**
-  - `cargo check --workspace --all-targets`: **PASS** (`36.99s`, 0 errors).
-  - `cargo clippy --workspace --all-targets -- -D warnings`: **PASS** (`39.79s`, 0 warnings, 0 errors).
+  - `cargo check --workspace --all-targets`: **PASS** (`54.63s`, 0 errors).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: **PASS** (`47.47s`, 0 warnings, 0 errors).
   - `cargo xtask layers`: **PASS** (`layers: ok`).
-  - `python3 .agents/harness/audit.py`: **0 vi phạm ngưỡng `>= 700` dòng** (kiểm toán `916` files: `21` đạt chuẩn, `0` cảnh báo `> 650` dòng, `895` ngoại lệ Upstream/Vendor).
-  - Unit tests (`node-graph-core` 3/3, `node-graph` 15/15 + 1/1, `filmcraft-render node_graph::tests` 3/3): **PASS** ở lần chạy kiểm chứng sau lần sửa code cuối.
+  - `python3 .agents/harness/audit.py`: **0 vi phạm ngưỡng `>= 700` dòng** (`919` files: `21` đạt chuẩn, `1` cảnh báo `> 650` dòng ở [crates/node-graph-core/src/node.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/node.rs) — 654 dòng, `897` ngoại lệ Upstream/Vendor).
+  - **Tests đã chạy sau lần sửa code liên quan:**
+    - `filmcraft-render`: `282 passed; 0 failed; 3 ignored` (`lib`), `6 passed` (`tests/it`), `1 passed` (`mixer_perf`) — đã chạy sau khi tách [node_graph_tests.rs](file:///mnt/Data/darkworks/crates/render/src/node_graph_tests.rs).
+    - `darkworks-node-graph-core` (`3/3`), `darkworks-node-graph` (`15/15` + `1/1`), `filmcraft-gpu` (`57 passed; 0 failed; 4 ignored` + `1` `export_pipeline`, parity `ultra_key` GPU thật `max rel diff` `6.88e-7` / `3.67e-7`, `0.000% flipped`), `filmcraft-golden` (`cpu::vfx_ultra_key` `1/1`): **PASS** trước khi tách file test sang `node_graph_tests.rs`.
 
 ---
 
 ## 2. DANH SÁCH FILE THAY ĐỔI KÈM LIÊN KẾT MARKDOWN
 
-### Mã nguồn Rust (Preset `.preset.json`, Nhóm A Atomic Nodes, Signals & UI)
-- [crates/node-graph-core/src/preset.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/preset.rs): `NodeGraphPresetDoc` (đầy đủ `nodes`, `pos`, `custom_title`, `wires`, `groups` + tương thích ngược preset cũ) và `chain_node_graphs` (nối tiếp DAG trước `Final Output`).
-- [crates/node-graph-core/src/node.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/node.rs) & [evaluator.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/evaluator.rs): Nâng cấp Nhóm A Atomic Nodes (`ColorGrade` Lumetri + `Exp Mod`, `BlurSharpen` `threshold` + `Radius Mod`, `DistortLens` thêm `Mirror`/`Offset`/`Posterize`/`Pixelate` + `feather`, `ShapeGenerator` `position`/`stroke`/`feather`/`Pos Mod`, `TextGenerator` `font_family`/`bold`/`italic`/`align`/`position`/`stroke`/`Pos Mod`, `Transition` `direction`/`ZoomPush`/`DipBlack`/`DipWhite`/`BlurDissolve`, `TimeDriver` & `AudioReactor` `track_name` + `Vec2 Out`).
-- [crates/node-graph/src/node_controls.rs](file:///mnt/Data/darkworks/crates/node-graph/src/node_controls.rs), [viewer.rs](file:///mnt/Data/darkworks/crates/node-graph/src/viewer.rs), [preset.rs](file:///mnt/Data/darkworks/crates/node-graph/src/preset.rs), [Cargo.toml](file:///mnt/Data/darkworks/crates/node-graph/Cargo.toml): Khóa `ui.vertical` chống đè chữ, `ComboBox` chọn Track cho `VideoInput`/`AudioReactor`, `ComboBox` chọn Font hệ thống từ `filmcraft-text` cho `TextGenerator`, sửa `Scale X/Y` trên `Transform2D`, sửa padding nhãn pin trái/phải.
-- [crates/render/src/nodes/signals.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/signals.rs), [node_graph.rs](file:///mnt/Data/darkworks/crates/render/src/node_graph.rs), [lib.rs](file:///mnt/Data/darkworks/crates/render/src/lib.rs), và các file [color.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/color.rs), [blur_distort.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/blur_distort.rs), [shape.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/shape.rs), [text.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/text.rs), [transform_blend.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/transform_blend.rs): Thực thi đầy đủ Nhóm A, `resolve_video_input` đọc đúng `V1..V4` / `All Below` / `Auto` (kể cả FX Clip, chống lặp), `compute_audio_rms_map` đọc riêng từng track (`Master`/`Linked`/`A1..A4`), và sửa FX Clip overlay không xóa video bên dưới.
-- [crates/engine/src/presets.rs](file:///mnt/Data/darkworks/crates/engine/src/presets.rs): Bổ sung `PresetLibrary::data_dir()`.
-- [crates/ui-egui/src/panels/node_graph_presets.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_presets.rs), [node_graph.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph.rs), [node_graph_menus.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_menus.rs), [panels.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels.rs): Hộp thoại `💾 Save Preset` (lưu vào `<data_dir>/Node Presets/` dùng chung mọi project), `💾 Export .preset.json`, `📥 Import Preset` và chế độ **Replace / Chain**.
+### Shader GPU, Planner & Node Graph Render (`crates/gpu`, `crates/render`)
+- [crates/gpu/src/fx.wgsl](file:///mnt/Data/darkworks/crates/gpu/src/fx.wgsl) & [crates/gpu/src/fx.rs](file:///mnt/Data/darkworks/crates/gpu/src/fx.rs): Thêm `OP_CHROMA_KEY = 37` chạy Y'CbCr (Bt.709) + 1px neighbor choke kẹp biên (`clamp`) + spill suppression (`G <= max(R, B)`).
+- [crates/gpu/src/fx_tests.rs](file:///mnt/Data/darkworks/crates/gpu/src/fx_tests.rs): Bổ sung 2 case `ultra_key` vào `gpu_effects_match_cpu_exactly`.
+- [crates/render/src/gpufx.rs](file:///mnt/Data/darkworks/crates/render/src/gpufx.rs): Thêm `FxOp::ChromaKey`, đưa `"ultra_key"` vào `GPU_EFFECTS` (mở GPU cho FilmCraft `ultra_key`), hàm CPU `chroma_key_matte` / `chroma_key_cpu`.
+- [crates/render/src/nodes/gpu_plan.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/gpu_plan.rs) *(mới)* & [crates/render/src/plan.rs](file:///mnt/Data/darkworks/crates/render/src/plan.rs): Biên dịch nhánh Node Graph tuyến tính (`VideoInput("Auto"|"Clip") -> Keyer/ColorGrade/BlurSharpen/DistortLens/CropMask/Transform2D -> Output`) trực tiếp thành `FramePlan::Layers` + `LayerFx` chạy 100% GPU; bổ sung 3 unit tests.
+- [crates/render/src/nodes.rs](file:///mnt/Data/darkworks/crates/render/src/nodes.rs), [color.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/color.rs), [blur_distort.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/blur_distort.rs), [signals.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/signals.rs), [lib.rs](file:///mnt/Data/darkworks/crates/render/src/lib.rs): Tối ưu CPU fallback (`take_or_clone_texture`, bỏ `snapshot()` thừa, tái dùng `below_image`, nâng cấp `BlurSharpen`/`DistortLens`, đồng bộ `ApplyKeyer` dùng `FxOp::ChromaKey`).
+- [crates/render/src/node_graph.rs](file:///mnt/Data/darkworks/crates/render/src/node_graph.rs) (`416` dòng) & [crates/render/src/node_graph_tests.rs](file:///mnt/Data/darkworks/crates/render/src/node_graph_tests.rs) *(mới, `296` dòng)*: Dùng `take_or_clone_texture` + `pool::recycle_f32` và tách khối `#[cfg(test)]` sang file riêng.
 
-### Kế hoạch, Feature Map & Bộ nhớ
-- [phase-3-node-graph.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/phase-3-node-graph.md), [master-plan-a-z.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/master-plan-a-z.md), [darkworks_node_presets_keyframes_migration.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/features/darkworks_node_presets_keyframes_migration.md), [decision-log.md](file:///mnt/Data/darkworks/.darkworks-ai/2-memory/decision-log.md) (#39), [node-graph/architecture.md](file:///mnt/Data/darkworks/.darkworks-ai/3-modules/node-graph/architecture.md), [ui/architecture.md](file:///mnt/Data/darkworks/.darkworks-ai/3-modules/ui/architecture.md), [system_map.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/system_map.md).
+### Node Schema, UI Controls & Kế Hoạch Phiên Sau
+- [crates/node-graph-core/src/lib.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/lib.rs) & [crates/node-graph-core/src/node.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/node.rs): Bổ sung `BlurDimensions`, `BlurType::RadialZoom`, `DistortType::{Twirl, FindEdges, NoiseGrain, TurbulentDisplace}`, `Reroute` (`Any` default).
+- [crates/node-graph/src/lib.rs](file:///mnt/Data/darkworks/crates/node-graph/src/lib.rs), [node.rs](file:///mnt/Data/darkworks/crates/node-graph/src/node.rs), [node_controls.rs](file:///mnt/Data/darkworks/crates/node-graph/src/node_controls.rs), [node_controls_fx.rs](file:///mnt/Data/darkworks/crates/node-graph/src/node_controls_fx.rs) *(mới)*, [preset.rs](file:///mnt/Data/darkworks/crates/node-graph/src/preset.rs), [viewer.rs](file:///mnt/Data/darkworks/crates/node-graph/src/viewer.rs), [tests/graph_tests.rs](file:///mnt/Data/darkworks/crates/node-graph/tests/graph_tests.rs), [crates/ui-egui/src/panels/node_graph_menus.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_menus.rs): Tách `node_controls_fx.rs`, lọc tham số UI theo chế độ `DistortLens` / `BlurSharpen`, kiểm tra nối dây `viewer::connect`, `CustomWgsl` template mới.
+- [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md) *(mới)*, [node-graph/architecture.md](file:///mnt/Data/darkworks/.darkworks-ai/3-modules/node-graph/architecture.md), [decision-log.md](file:///mnt/Data/darkworks/.darkworks-ai/2-memory/decision-log.md) (#40), [system_map.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/system_map.md).
 
 ---
 
 ## 3. CÁC LỖI ĐÃ GIẢI QUYẾT TRONG PHIÊN (RESOLVED ISSUES)
-1. **Triển khai Lưu / Xuất / Nhập `.preset.json` đầy đủ (`Task 3.12` / `DW-06`):** Giữ nguyên 100% dây nối, tọa độ, tên tùy chỉnh và `VisualGroup`; lưu dùng chung mọi project tại `<data_dir>/Node Presets/` và hỗ trợ Replace/Chain.
-2. **Nâng cấp Nhóm A Atomic Nodes:** Hoàn thiện `ColorGrade` (Lumetri tonal + split tone + `Exp Mod`), `BlurSharpen` (Box thật + `threshold` + `Radius Mod`), `DistortLens` (`Mirror`, `Offset`, `Posterize`, `Pixelate`, `feather`), `ShapeGenerator` & `TextGenerator` (`position`, `stroke`, `feather`, `Font` ComboBox, `Bold/Italic`, `Align`, `Pos Mod`), `Transition` (`direction`, `ZoomPush` thật, `DipBlack/White`, `BlurDissolve`), `TimeDriver`/`AudioReactor` (`Vec2 Out`).
-3. **`VideoInput` không chọn được V2 & FX Clip overlay xóa video V1:** Thêm ComboBox chọn track trên `VideoInput`, nâng cấp `resolve_video_input` đọc đúng track (kể cả FX Clip có chống đệ quy) và sửa `crates/render/src/lib.rs` composite FX Clip không có `VideoInput` đè lên `below`.
-4. **Lỗi đè chữ `Color:` + `Bold/Italic/Font Family` trên `TextGenerator` & `Scale` trên `Transform2D`:** Đổi `render_node_body` sang `ui.vertical` (khắc phục `Layout::left_to_right` của `egui_snarl`), bỏ padding dư ở `show_input`, tách `show_output`, thêm `Scale X/Y`.
+1. **RCA & Sửa lỗi `AudioReactor` + `ColorGrade` (`Exp` / Preset 4):** Khớp hệ số phơi sáng tuyến tính + `Exp Mod * 2.5`, xác nhận `AudioBeatFlash` hoạt động rõ rệt.
+2. **Sửa 3 tồn đọng Node Graph:** `Reroute` đổi kiểu trực tiếp (`Any` default), `CustomWgsl` từ menu có sẵn `fn fs_main`, và `DarkworksViewer::connect` chặn kéo dây sai kiểu ngay trên Canvas.
+3. **Hoàn thiện `BlurSharpen` & `DistortLens` + UI lọc tham số:** Ẩn các ô `Radius`/`Center X/Y` không liên quan ở `Posterize`, `ChromaticAberration`...; bổ sung `RadialZoom`, `dimensions`, `repeat_edge`, `bokeh_sides`, `Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace`; tách `node_controls_fx.rs`.
+4. **Sửa lag 87% CPU & viền xanh ở `Ultra Keyer` + FilmCraft `ultra_key`:** Đưa Y'CbCr Bt.709 + 1px choke kẹp biên + spill suppression lên GPU `OP_CHROMA_KEY = 37` và biên dịch nhánh tuyến tính `Apply to Clip` qua `gpu_plan.rs` (Người Dùng đã xác nhận test thực tế hết lag khi nối `Video Input (Auto) -> Ultra Keyer -> Final Output` bằng `Apply to Clip`).
+5. **Tách `node_graph_tests.rs`:** Rút [node_graph.rs](file:///mnt/Data/darkworks/crates/render/src/node_graph.rs) từ 712 xuống 416 dòng (`< 700` dòng).
 
 ---
 
 ## 4. KẾ HOẠCH BÀN GIAO CA KẾ TIẾP (NEXT ACTIONS CHECKLIST)
-> ⚠️ **BẮT BUỘC TUÂN THỦ LUẬT #1:** Người Dùng vừa báo lỗi **`Audio Reactor` có vẻ fail khi test thực tế**. Khi mở phiên tiếp theo, **PHẢI phân tích RCA và hỏi ý kiến Người Dùng trước khi sửa code!**
+> 🎯 **Trọng tâm duy nhất phiên sau:** Thực hiện theo [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md) để hoàn thiện node **`🟢 Ultra Keyer`** lên chuẩn Pro NLE.
 
-- [ ] **1. Điều tra & sửa lỗi `Audio Reactor` (ƯU TIÊN SỐ 1 — Hỏi User trước khi sửa code):**
-  - Kiểm tra kỹ vì sao `Audio Reactor` chưa chạy / ra RMS = `0` hoặc không tác động đúng khi test trên app (`compute_audio_rms_map` trong [signals.rs](file:///mnt/Data/darkworks/crates/render/src/nodes/signals.rs), `crate::audio::mix_sequence` / `track_input`, `sources` truyền vào `render_seq`, hoặc việc `eval_item_graph` bị cache frame tĩnh của `render`/viewport khi audio thay đổi!).
-  - Gợi ý kiểm tra: khi clip video có `node_graph` chứa `AudioReactor` hoặc `TimeDriver`, kiểm tra xem cache khung hình ở Viewport/Engine (`playback` / `render_cache` / `frame_key`) có biết frame thay đổi theo thời gian hay đang cache theo nguồn tĩnh không, và kiểm tra `start` / `win_frames` / `sources` khi lấy mẫu audio từ `FfmpegMediaSource` hoặc clip audio!
-- [ ] **2. Tiếp tục kiểm tra từng node còn lại & sửa 3 điểm tồn đọng đã soi thấy:**
-  - `CustomWgsl` từ toolbar menu ([node_graph_menus.rs](file:///mnt/Data/darkworks/crates/ui-egui/src/panels/node_graph_menus.rs#L140-L147)): đoạn snippet mặc định thiếu `fn fs_main`.
-  - `Reroute`: thêm chọn kiểu `Any` / `Scalar` / `Vec2` / `Texture` để bẻ góc được dây tín hiệu vàng/cam.
-  - `DarkworksViewer::connect` ([viewer.rs](file:///mnt/Data/darkworks/crates/node-graph/src/viewer.rs)): chặn kéo dây sai kiểu (`NodeDataType::can_connect_to`) ngay trên canvas.
-  - Kiểm tra tiếp các node `BlurSharpen`, `DistortLens`, `Blend`, `Transition`, `Keyer`, `CropMask` trên app theo yêu cầu của User.
-- [ ] **3. Nghiệm thu `DW-06` (`Test 6.1 – 6.3`) & Triển khai `Task 3.13` (Node & Preset Library Browser):**
-  - Xây dựng **Node & Preset Library Browser** (tìm kiếm real-time, lọc Category/Favorites, lưới Thumbnail xem trước tự render qua Node Graph trên `preview_image`, Quick Search `Tab`, và kéo thả thẳng vào Node Graph hoặc Clip trên Timeline).
-  - Chuyển đổi bộ 18 `lumetri_presets` + Micro-Presets sang `.preset.json`.
+- [ ] **1. Tách enum/struct phụ khỏi [node.rs](file:///mnt/Data/darkworks/crates/node-graph-core/src/node.rs) (đang 654 dòng) & mở rộng `DarkNode::Keyer` (`#[serde(default)]`):**
+  - Thêm `Mode` (`ChromaKey` / `LumaKey`), `Output` (`Composite` / `AlphaChannel` / `ColorChannel`), `Pedestal`, `Highlight`, `Shadow`, `Choke`, `Soften`, `Matte Contrast`, `Desaturate`, `Spill Luma`, `Invert Matte` (+ tùy chọn pin `Garbage Matte`).
+- [ ] **2. Nâng cấp Shader WGSL (`fx.wgsl` / `fx.rs` / `gpufx.rs`):**
+  - Hỗ trợ đầy đủ tham số mới trên GPU (gồm `choke`/`soften`, `AlphaChannel`, `LumaKey`, bù sáng `spill_luma`), đồng thời mở khóa GPU cho các preset `Relaxed` / `Aggressive` của FilmCraft `ultra_key`.
+- [ ] **3. Đưa `Add as FX Clip` (`AdjustmentLayer`) & Graph 4 node (`V1 + Blend`) lên GPU (`plan.rs` / `gpu_plan.rs`):**
+  - Biên dịch `AdjustmentLayer` tuyến tính thành `PlanStep::Adjust` và mẫu `Blend(VideoInput("All Below" | "V1"))` thành `PlanLayer { fx, blend, opacity }`.
+- [ ] **4. UI lọc theo Mode (`node_controls_fx.rs`) & Eyedropper trên Program Monitor (`monitor.rs`):**
+  - Nhóm gọn `Matte Cleanup` / `Spill` và cho phép bấm nút hút màu trên node rồi click thẳng vào vùng xanh trong Program Monitor.

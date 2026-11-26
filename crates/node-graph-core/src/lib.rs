@@ -17,8 +17,8 @@ pub use custom_shader::{WgslError, WgslParser, WgslUniform};
 pub use doc::{NodeEntry, NodeGraphDoc, NodeWire, VisualGroupDoc};
 pub use evaluator::{DagDocPlan, DagDocStep, DagError, DagEvaluator, EvaluationContext};
 pub use node::{
-    ActionScope, AudioBand, BlendMode, BlurType, DarkNode, DistortType, ShapeType, TextAlign,
-    TimeMode, TransitionDirection, TransitionType,
+    ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,
+    ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
 };
 pub use preset::{
     NodeGraphPresetDoc, PresetDocError, chain_node_graphs, ensure_preset_extension,

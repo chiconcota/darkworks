@@ -219,7 +219,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
             if ui.button("🔊 Audio Reactor").clicked() { snarl.insert_node(pos, DarkNode::default_audio_reactor(crate::node::AudioBand::Bass, 1.0, 0.2)); ui.close(); }
             if ui.button("💻 Custom WGSL").clicked() { snarl.insert_node(pos, DarkNode::CustomWgsl { name: "WGSL".into(), code: "@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> { return vec4<f32>(uv.x, uv.y, 0.5, 1.0); }".into() }); ui.close(); }
             if ui.button("📝 Sticky Note").clicked() { snarl.insert_node(pos, DarkNode::StickyNote { title: "Note".into(), content: "Note".into(), color_idx: 0 }); ui.close(); }
-            if ui.button("● Reroute").clicked() { snarl.insert_node(pos, DarkNode::Reroute { data_type: NodeDataType::Texture }); ui.close(); }
+            if ui.button("● Reroute").clicked() { snarl.insert_node(pos, DarkNode::Reroute { data_type: NodeDataType::Any }); ui.close(); }
         });
     }
 
@@ -550,7 +550,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
                 _ => ("Vec2 Out", NodeDataType::Vec2),
             },
             DarkNode::AudioReactor { .. } => match pin.id.output {
-                0 => ("Peak Value", NodeDataType::Scalar),
+                0 => ("Peak Value", NodeDataType::AudioFloat),
                 _ => ("Vec2 Out", NodeDataType::Vec2),
             },
             DarkNode::ActionNode { .. } => ("Flow Out", NodeDataType::ActionFlow),
@@ -566,8 +566,16 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         PinInfo::circle().with_fill(crate::types::pin_color32(data_type))
     }
 
-    fn has_body(&mut self, node: &DarkNode) -> bool {
-        !matches!(node, DarkNode::Reroute { .. })
+    fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<DarkNode>) {
+        let out_type = snarl[from.id.node].output_data_type(from.id.output);
+        let in_type = snarl[to.id.node].input_data_type(to.id.input);
+        if out_type.can_connect_to(in_type) {
+            snarl.connect(from.id, to.id);
+        }
+    }
+
+    fn has_body(&mut self, _node: &DarkNode) -> bool {
+        true
     }
 
     fn show_body(

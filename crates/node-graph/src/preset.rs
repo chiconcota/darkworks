@@ -319,61 +319,47 @@ impl NodeGraphPreset {
         (snarl, vec![group])
     }
 
-    /// Khởi tạo Preset 4: Chớp giật âm bản theo nhịp Bass (Audio Beat Invert Flash)
+    /// Khởi tạo Preset 4: Chớp sáng theo nhịp Bass (Audio Beat Flash)
     #[must_use]
     pub fn build_audio_beat_flash_preset() -> (Snarl<DarkNode>, Vec<VisualGroup>) {
         let mut snarl = Snarl::<DarkNode>::new();
 
         let video_in_id = snarl.insert_node(
-            Pos2::new(80.0, 80.0),
+            Pos2::new(80.0, 100.0),
             DarkNode::VideoInput { track_name: "Auto".to_string() },
         );
 
-        let solid_white_id = snarl.insert_node(
-            Pos2::new(80.0, 220.0),
-            DarkNode::default_shape(
-                ShapeType::SolidMatte,
-                [1920.0, 1080.0],
-                0.0,
-                [1.0, 1.0, 1.0, 1.0],
-            ),
-        );
-
         let audio_id = snarl.insert_node(
-            Pos2::new(80.0, 360.0),
-            DarkNode::default_audio_reactor(AudioBand::Bass, 1.8, 0.1),
+            Pos2::new(80.0, 260.0),
+            DarkNode::default_audio_reactor(AudioBand::Bass, 1.4, 0.15),
         );
 
-        let blend_id = snarl.insert_node(
-            Pos2::new(450.0, 180.0),
-            DarkNode::Blend {
-                mode: BlendMode::Difference,
-                opacity: 1.0,
-            },
+        let grade_id = snarl.insert_node(
+            Pos2::new(420.0, 140.0),
+            DarkNode::default_color_grade(),
         );
 
-        let output_id = snarl.insert_node(Pos2::new(750.0, 180.0), DarkNode::Output);
+        let output_id = snarl.insert_node(Pos2::new(740.0, 140.0), DarkNode::Output);
 
-        // Nối dây:
+        // Nối dây: Video -> ColorGrade (pin 0), AudioReactor -> ColorGrade Exp Mod (pin 1) -> Output
         snarl.connect(
             OutPinId { node: video_in_id, output: 0 },
-            InPinId { node: blend_id, input: 0 },
+            InPinId { node: grade_id, input: 0 },
         );
         snarl.connect(
-            OutPinId { node: solid_white_id, output: 0 },
-            InPinId { node: blend_id, input: 1 },
+            OutPinId { node: audio_id, output: 0 },
+            InPinId { node: grade_id, input: 1 },
         );
         snarl.connect(
-            OutPinId { node: blend_id, output: 0 },
+            OutPinId { node: grade_id, output: 0 },
             InPinId { node: output_id, input: 0 },
         );
-        let _ = audio_id;
 
         let group = VisualGroup::new(
             4,
             "4. AUDIO BEAT FLASH PIPELINE".to_string(),
-            Pos2::new(60.0, 40.0),
-            Vec2::new(650.0, 420.0),
+            Pos2::new(60.0, 50.0),
+            Vec2::new(640.0, 380.0),
             Color32::from_rgba_unmultiplied(255, 214, 0, 30),
         );
 

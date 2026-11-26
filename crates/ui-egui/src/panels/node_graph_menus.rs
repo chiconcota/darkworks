@@ -139,7 +139,7 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
             state.push_undo();
             state.snarl.insert_node(Pos2::new(250.0, 100.0), DarkNode::CustomWgsl {
                 name: "Custom Filter".to_string(),
-                code: "// WGSL Shader Compute\noutput_color = vec4<f32>(1.0 - in.r, 1.0 - in.g, 1.0 - in.b, in.a);".to_string(),
+                code: "@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {\n    let c = textureSample(src_tex, src_samp, uv);\n    return vec4<f32>(vec3<f32>(c.a) - c.rgb, c.a);\n}".to_string(),
             });
             ui.close();
         }
@@ -154,7 +154,7 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
         }
         if ui.button("● Reroute Dot").clicked() {
             state.push_undo();
-            state.snarl.insert_node(Pos2::new(200.0, 200.0), DarkNode::Reroute { data_type: NodeDataType::Texture });
+            state.snarl.insert_node(Pos2::new(200.0, 200.0), DarkNode::Reroute { data_type: NodeDataType::Any });
             ui.close();
         }
         if ui.button("🖥️ Final Output").clicked() {

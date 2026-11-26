@@ -89,7 +89,7 @@ pub(crate) fn resolve_video_input(
             .map_or_else(|| Image::new(w, h), |img| fit_image(img, w, h));
     }
 
-    let Some((_, track)) = find_video_track(seq, key) else {
+    let Some((target_idx, track)) = find_video_track(seq, key) else {
         return Image::new(w, h);
     };
 
@@ -98,6 +98,20 @@ pub(crate) fn resolve_video_input(
         && let Some(img) = clip_image
     {
         return fit_image(img, w, h);
+    }
+
+    // Tái sử dụng `below_image` đã render sẵn nếu `track` là track Video duy nhất nằm dưới `current_item`
+    if let Some(below) = below_image {
+        let cur_idx = seq
+            .video_tracks
+            .iter()
+            .position(|tr| tr.items.iter().any(|it| it.id == current_item.id));
+        if let Some(ci) = cur_idx
+            && target_idx < ci
+            && seq.video_tracks[..ci].iter().filter(|tr| tr.enabled && tr.item_at(t).is_some_and(|it| it.enabled)).count() == 1
+        {
+            return fit_image(below, w, h);
+        }
     }
 
     let Some(target) = track.item_at(t) else {
@@ -237,9 +251,23 @@ pub(crate) fn compute_audio_rms_map(
     }
 
     let sr = seq.settings.sample_rate.max(8000);
-    let win_frames = (1024.0 + max_smooth * 3072.0).round() as usize;
-    let start = ((t.seconds() * sr as f64).round() as i64).saturating_sub((win_frames / 2) as i64);
-    let win = AudioWin { start, frames: win_frames, sr };
+    let win_frames = (1536.0 + max_smooth * 2560.0).round() as usize;
+    let warmup = 2048usize;
+    let total_frames = warmup + win_frames;
+    let start = ((t.seconds() * sr as f64).round() as i64)
+        .saturating_sub((win_frames / 2) as i64)
+        .saturating_sub(warmup as i64);
+    let win = AudioWin { start, frames: total_frames, sr };
+
+    let dt = 1.0 / sr as f32;
+    let rc_alpha = |hz: f32| -> f32 {
+        let rc = 1.0 / (std::f32::consts::TAU * hz.max(1.0));
+        dt / (rc + dt)
+    };
+    let a_sub = rc_alpha(85.0);
+    let a_bass = rc_alpha(160.0);
+    let a_lmid = rc_alpha(450.0);
+    let a_hmid = rc_alpha(2400.0);
 
     let mut buffers: HashMap<String, AudioBuffer> = HashMap::new();
     for (id, band, smooth, track_name) in reactors {
@@ -254,56 +282,95 @@ pub(crate) fn compute_audio_rms_map(
 
         let ch0 = &buf.channels[0];
         let n = ch0.len();
-        let local_win = ((1024.0 + smooth * 3072.0).round() as usize).min(n).max(1);
-        let lo = (n - local_win) / 2;
+        let measure_start = warmup.min(n.saturating_sub(1));
+        let measure_avail = n.saturating_sub(measure_start).max(1);
+        let local_win = ((1024.0 + smooth * 2560.0).round() as usize).min(measure_avail).max(1);
+        let lo = measure_start + (measure_avail - local_win) / 2;
         let hi = (lo + local_win).min(n);
 
-        let alpha = match band {
-            AudioBand::SubBass => 0.04,
-            AudioBand::Bass => 0.09,
-            AudioBand::LowMid => 0.22,
-            AudioBand::HighMid => 0.45,
-            AudioBand::Treble | AudioBand::MasterPeak => 1.0,
-        };
-
         let mut sum_sq = 0.0f64;
-        let mut lp = 0.0f32;
-        let mut prev_s = 0.0f32;
-        for i in lo..hi {
-            let mut s = ch0[i];
+        let mut peak = 0.0f32;
+        let mut lp1 = 0.0f32;
+        let mut lp2 = 0.0f32;
+        let mut lp_low = 0.0f32;
+        for (i, &c0) in ch0.iter().enumerate().take(hi) {
+            let mut s = c0;
             if buf.channels.len() > 1 {
                 s = 0.5 * (s + buf.channels[1][i]);
             }
             let val = match band {
                 AudioBand::MasterPeak => s,
-                AudioBand::Treble => {
-                    let diff = if i > lo { s - prev_s } else { s };
-                    prev_s = s;
-                    diff
+                AudioBand::SubBass => {
+                    lp1 += a_sub * (s - lp1);
+                    lp2 += a_sub * (lp1 - lp2);
+                    lp2
                 }
-                _ => {
-                    lp += alpha * (s - lp);
-                    lp
+                AudioBand::Bass => {
+                    lp1 += a_bass * (s - lp1);
+                    lp2 += a_bass * (lp1 - lp2);
+                    lp2
+                }
+                AudioBand::LowMid => {
+                    lp1 += a_lmid * (s - lp1);
+                    lp_low += a_bass * (s - lp_low);
+                    lp1 - lp_low
+                }
+                AudioBand::HighMid => {
+                    lp1 += a_hmid * (s - lp1);
+                    lp_low += a_lmid * (s - lp_low);
+                    lp1 - lp_low
+                }
+                AudioBand::Treble => {
+                    lp1 += a_hmid * (s - lp1);
+                    s - lp1
                 }
             };
-            sum_sq += (val as f64) * (val as f64);
+            if i >= lo {
+                let abs_v = val.abs();
+                if abs_v > peak {
+                    peak = abs_v;
+                }
+                sum_sq += (val as f64) * (val as f64);
+            }
         }
-        let rms = ((sum_sq / (hi - lo).max(1) as f64).sqrt() as f32 * 2.2).clamp(0.0, 1.0);
-        result.insert(id, rms);
+        let rms = (sum_sq / (hi - lo).max(1) as f64).sqrt() as f32;
+        let energy = 0.55 * rms + 0.45 * peak;
+        let level = (energy * 2.4).powf(0.85).clamp(0.0, 1.0);
+        result.insert(id, level);
     }
     result
 }
 
-pub(crate) fn input_texture(
+pub(crate) fn count_wire_uses(doc: &NodeGraphDoc) -> HashMap<usize, usize> {
+    let mut counts = HashMap::new();
+    for w in &doc.wires {
+        *counts.entry(w.out_node).or_insert(0) += 1;
+    }
+    counts
+}
+
+pub(crate) fn take_or_clone_texture(
     doc: &NodeGraphDoc,
-    textures: &HashMap<usize, Image>,
+    textures: &mut HashMap<usize, Image>,
+    use_counts: &mut HashMap<usize, usize>,
     node_id: usize,
     pin: usize,
     w: usize,
     h: usize,
 ) -> Image {
-    doc.source_for_pin(node_id, pin)
-        .and_then(|(src_id, _)| textures.get(&src_id))
+    let Some((src_id, _)) = doc.source_for_pin(node_id, pin) else {
+        return Image::new(w, h);
+    };
+    if let Some(cnt) = use_counts.get_mut(&src_id) {
+        *cnt = cnt.saturating_sub(1);
+        if *cnt == 0
+            && let Some(img) = textures.remove(&src_id)
+        {
+            return img;
+        }
+    }
+    textures
+        .get(&src_id)
         .cloned()
         .unwrap_or_else(|| Image::new(w, h))
 }
@@ -335,11 +402,18 @@ pub(crate) fn modulated_scalar_add(doc: &NodeGraphDoc, ctx: &EvaluationContext, 
     base
 }
 
-pub(crate) fn modulated_scalar_add_raw(doc: &NodeGraphDoc, ctx: &EvaluationContext, node_id: usize, pin: usize, base: f32) -> f32 {
+pub(crate) fn modulated_scalar_add_scaled(
+    doc: &NodeGraphDoc,
+    ctx: &EvaluationContext,
+    node_id: usize,
+    pin: usize,
+    base: f32,
+    scale: f32,
+) -> f32 {
     if let Some((src_id, _)) = doc.source_for_pin(node_id, pin)
         && let Some(&v) = ctx.scalar_outputs.get(&src_id)
     {
-        return base + v;
+        return base + v * scale;
     }
     base
 }

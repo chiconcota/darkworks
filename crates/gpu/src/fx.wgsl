@@ -55,6 +55,7 @@ const OP_BOKEH_BOOST: u32 = 33u;
 const OP_BOKEH: u32 = 34u;
 const OP_BOKEH_UP: u32 = 35u;
 const OP_THREE_WAY: u32 = 36u;
+const OP_CHROMA_KEY: u32 = 37u;
 
 fn size() -> vec2<i32> {
     return vec2<i32>(i32(u.i0.y), i32(u.i0.z));
@@ -645,6 +646,26 @@ fn lumetri_op(c: vec3<f32>, p: vec2<i32>) -> vec3<f32> {
     return dec(v);
 }
 
+fn chroma_key_matte(px: vec4<f32>, k_cbcr: vec2<f32>, kmag2: f32, tol: f32, gain: f32, pedestal: f32) -> f32 {
+    if px.a <= 1e-6 {
+        return 0.0;
+    }
+    let v = enc(px.rgb / px.a);
+    let kr = 0.2126;
+    let kb = 0.0722;
+    let kg = 1.0 - kr - kb;
+    let y = kr * v.x + kg * v.y + kb * v.z;
+    let cb = (v.z - y) / (2.0 * (1.0 - kb));
+    let cr = (v.x - y) / (2.0 * (1.0 - kr));
+    let proj = (cb * k_cbcr.x + cr * k_cbcr.y) / kmag2;
+    let d_cb = cb - proj * k_cbcr.x;
+    let d_cr = cr - proj * k_cbcr.y;
+    let perp = sqrt(d_cb * d_cb + d_cr * d_cr) / sqrt(kmag2);
+    let keyness = clamp(proj, 0.0, 1.5) * (1.0 - smoothstep_fx(0.0, tol, perp));
+    let m = clamp(1.0 - keyness * gain, 0.0, 1.0);
+    return clamp((m - pedestal) / (1.0 - pedestal), 0.0, 1.0);
+}
+
 // One output pixel of every op but the running-sum box blur.
 fn pixel(op: u32, p: vec2<i32>) -> vec4<f32> {
     let s = size();
@@ -831,6 +852,47 @@ fn pixel(op: u32, p: vec2<i32>) -> vec4<f32> {
             let c = o.rgb / a;
             let res = lumetri_op(c, p);
             return vec4(res * a, a);
+        }
+        case OP_CHROMA_KEY: {
+            let o = ld(p);
+            if o.a <= 1e-6 {
+                return o;
+            }
+            let k_cbcr = u.p0.xy;
+            let kmag2 = u.p0.z;
+            let tol = u.p0.w;
+            let gain = u.p1.x;
+            let pedestal = u.p1.y;
+            let spill = u.p1.z;
+            let dom = u.i1.x;
+            var a = chroma_key_matte(o, k_cbcr, kmag2, tol, gain, pedestal);
+            if a > 0.0 && a < 0.98 {
+                let hi = size() - vec2(1, 1);
+                let n0 = chroma_key_matte(ld(clamp(p + vec2(-1, 0), vec2(0), hi)), k_cbcr, kmag2, tol, gain, pedestal);
+                let n1 = chroma_key_matte(ld(clamp(p + vec2(1, 0), vec2(0), hi)), k_cbcr, kmag2, tol, gain, pedestal);
+                let n2 = chroma_key_matte(ld(clamp(p + vec2(0, -1), vec2(0), hi)), k_cbcr, kmag2, tol, gain, pedestal);
+                let n3 = chroma_key_matte(ld(clamp(p + vec2(0, 1), vec2(0), hi)), k_cbcr, kmag2, tol, gain, pedestal);
+                let nb_min = min(min(n0, n1), min(n2, n3));
+                if nb_min < 0.05 {
+                    a = min(a, 0.5 * (a + nb_min));
+                }
+            }
+            var v = enc(o.rgb / o.a);
+            let limit = select(select(max(v.x, v.y), max(v.x, v.z), dom == 1u), max(v.y, v.z), dom == 0u);
+            let dom_val = select(select(v.z, v.y, dom == 1u), v.x, dom == 0u);
+            let excess = max(dom_val - limit, 0.0);
+            if excess > 0.0 && spill > 0.0 {
+                if dom == 0u { v.x -= excess * spill; }
+                else if dom == 1u { v.y -= excess * spill; }
+                else { v.z -= excess * spill; }
+                if a < 0.98 {
+                    let lm = luma709(v);
+                    v = mix(v, vec3(lm), (1.0 - a) * spill * 0.65);
+                }
+            }
+            let res = dec(v);
+            let na = o.a * a;
+            return vec4(res * na, na);
         }
         default: {
             let o = ld(p);
