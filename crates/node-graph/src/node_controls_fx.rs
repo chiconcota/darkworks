@@ -2,14 +2,16 @@
 //! (`ColorGrade`, `BlurSharpen`, `DistortLens`, `Transition`, `Keyer`).
 
 use egui::{ComboBox, DragValue, Grid, Ui};
+use egui_snarl::NodeId;
 
 use crate::node::{
-    BlurDimensions, BlurType, DarkNode, DistortType, TransitionDirection, TransitionType,
+    BlurDimensions, BlurType, DarkNode, DistortType, KeyerMode, KeyerOutput, TransitionDirection,
+    TransitionType,
 };
-use crate::node_controls::{check_box, color_picker_rgba, drag_val};
+use crate::node_controls::{check_box, color_picker_rgb_ex, color_picker_rgba_ex, drag_val};
 
 /// Render UI controls cho nhóm hiệu ứng hình ảnh; trả về `true` nếu node thuộc nhóm này.
-pub(crate) fn render_fx_controls(node: &mut DarkNode, node_ptr: usize, ui: &mut Ui) -> bool {
+pub(crate) fn render_fx_controls(node_id: NodeId, node: &mut DarkNode, node_ptr: usize, ui: &mut Ui) -> bool {
     match node {
         DarkNode::ColorGrade {
             exposure,
@@ -51,7 +53,7 @@ pub(crate) fn render_fx_controls(node: &mut DarkNode, node_ptr: usize, ui: &mut 
                 drag_val(ui, DragValue::new(gamma).range(0.1..=4.0).speed(0.05));
                 ui.end_row();
                 ui.label("Tint Color:");
-                color_picker_rgba(ui, tint_color);
+                color_picker_rgba_ex(ui, node_id, "color.tint_color", tint_color);
                 ui.end_row();
                 ui.label("Tint Mix:");
                 drag_val(ui, DragValue::new(tint_amount).range(0.0..=1.0).speed(0.02));
@@ -78,10 +80,10 @@ pub(crate) fn render_fx_controls(node: &mut DarkNode, node_ptr: usize, ui: &mut 
                     drag_val(ui, DragValue::new(faded_film).range(0.0..=100.0).speed(0.5));
                     ui.end_row();
                     ui.label("Shad Tint:");
-                    ui.color_edit_button_rgb(shadow_tint);
+                    color_picker_rgb_ex(ui, node_id, "color.shadow_tint", shadow_tint);
                     ui.end_row();
                     ui.label("High Tint:");
-                    ui.color_edit_button_rgb(highlight_tint);
+                    color_picker_rgb_ex(ui, node_id, "color.highlight_tint", highlight_tint);
                     ui.end_row();
                 });
             });
@@ -297,21 +299,105 @@ pub(crate) fn render_fx_controls(node: &mut DarkNode, node_ptr: usize, ui: &mut 
             similarity,
             smoothness,
             spill_suppress,
+            mode,
+            output,
+            pedestal,
+            highlight,
+            shadow,
+            choke,
+            soften,
+            matte_contrast,
+            invert_matte,
+            desaturate,
+            spill_luma,
+            luma_threshold,
+            luma_cutoff,
         } => {
             Grid::new(("ky_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
-                ui.label("Key Color:");
-                ui.color_edit_button_rgb(key_color);
+                ui.label("Mode:");
+                ComboBox::from_id_salt(("ky_mode", node_ptr))
+                    .selected_text(match mode {
+                        KeyerMode::ChromaKey => "Chroma Key",
+                        KeyerMode::LumaKey => "Luma Key",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(mode, KeyerMode::ChromaKey, "Chroma Key");
+                        ui.selectable_value(mode, KeyerMode::LumaKey, "Luma Key");
+                    });
                 ui.end_row();
-                ui.label("Similarity:");
-                drag_val(ui, DragValue::new(similarity).range(0.0..=1.0).speed(0.01));
+                ui.label("Output:");
+                ComboBox::from_id_salt(("ky_out", node_ptr))
+                    .selected_text(match output {
+                        KeyerOutput::Composite => "Composite",
+                        KeyerOutput::AlphaChannel => "Alpha Channel",
+                        KeyerOutput::ColorChannel => "Color Channel",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(output, KeyerOutput::Composite, "Composite");
+                        ui.selectable_value(output, KeyerOutput::AlphaChannel, "Alpha Channel");
+                        ui.selectable_value(output, KeyerOutput::ColorChannel, "Color Channel");
+                    });
                 ui.end_row();
-                ui.label("Smooth:");
-                drag_val(ui, DragValue::new(smoothness).range(0.0..=1.0).speed(0.01));
-                ui.end_row();
-                ui.label("Spill:");
-                drag_val(ui, DragValue::new(spill_suppress).range(0.0..=1.0).speed(0.01));
-                ui.end_row();
+                match mode {
+                    KeyerMode::ChromaKey => {
+                        ui.label("Key Color:");
+                        color_picker_rgb_ex(ui, node_id, "keyer.key_color", key_color);
+                        ui.end_row();
+                        ui.label("Similarity:");
+                        drag_val(ui, DragValue::new(similarity).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Smooth:");
+                        drag_val(ui, DragValue::new(smoothness).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Pedestal:");
+                        drag_val(ui, DragValue::new(pedestal).range(0.0..=0.9).speed(0.01));
+                        ui.end_row();
+                        ui.label("Highlight:");
+                        drag_val(ui, DragValue::new(highlight).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Shadow:");
+                        drag_val(ui, DragValue::new(shadow).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                    }
+                    KeyerMode::LumaKey => {
+                        ui.label("Threshold:");
+                        drag_val(ui, DragValue::new(luma_threshold).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Cutoff:");
+                        drag_val(ui, DragValue::new(luma_cutoff).range(0.01..=1.0).speed(0.01));
+                        ui.end_row();
+                    }
+                }
             });
+            ui.collapsing("🧹 Matte Cleanup", |ui| {
+                Grid::new(("ky_clean_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
+                    ui.label("Choke:");
+                    drag_val(ui, DragValue::new(choke).range(0.0..=1.0).speed(0.01));
+                    ui.end_row();
+                    ui.label("Soften:");
+                    drag_val(ui, DragValue::new(soften).range(0.0..=1.0).speed(0.01));
+                    ui.end_row();
+                    ui.label("Contrast:");
+                    drag_val(ui, DragValue::new(matte_contrast).range(0.0..=1.0).speed(0.01));
+                    ui.end_row();
+                });
+                check_box(ui, invert_matte, "Invert Matte");
+            });
+            if *mode == KeyerMode::ChromaKey {
+                ui.collapsing("💧 Spill Suppression", |ui| {
+                    Grid::new(("ky_spill_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
+                        ui.label("Spill:");
+                        drag_val(ui, DragValue::new(spill_suppress).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Desat:");
+                        drag_val(ui, DragValue::new(desaturate).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                        ui.label("Luma Boost:");
+                        drag_val(ui, DragValue::new(spill_luma).range(0.0..=1.0).speed(0.01));
+                        ui.end_row();
+                    });
+                });
+            }
             true
         }
         _ => false,

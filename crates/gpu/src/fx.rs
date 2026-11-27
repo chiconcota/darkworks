@@ -64,6 +64,7 @@ type Target = (wgpu::Texture, wgpu::TextureView);
 pub(crate) struct FxStage {
     px: wgpu::ComputePipeline,
     run: wgpu::ComputePipeline,
+    node_px: wgpu::ComputePipeline,
     bgl: wgpu::BindGroupLayout,
     /// Draws a layer's source into a working texture (`composite.wgsl` `fs`, no blending).
     source: wgpu::RenderPipeline,
@@ -77,9 +78,16 @@ pub(crate) struct FxStage {
 
 /// One compute pass of a job.
 struct Dispatch {
-    run: bool,
+    pipeline: StepPipeline,
     bg: wgpu::BindGroup,
     groups: (u32, u32),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StepPipeline {
+    FxPx,
+    FxRun,
+    NodePx,
 }
 
 /// The recorded work of one layer's effects (bind groups made; recorded into the frame's encoder
@@ -94,26 +102,34 @@ pub(crate) struct FxJob {
 }
 
 /// One pass before texture routing: entry point, op code, integer and float parameters.
-struct Step {
-    run: bool,
-    code: u32,
-    i1: [u32; 4],
-    p: [f32; 24],
-    /// Unsharp combine: reads the blurred image and the original.
-    combine: bool,
-    /// A blur pass of Unsharp Mask (the original stays untouched until the combine).
-    unsharp_blur: bool,
+pub(crate) struct Step {
+    pub(crate) pipeline: StepPipeline,
+    pub(crate) code: u32,
+    pub(crate) i1: [u32; 4],
+    pub(crate) p: [f32; 24],
+    /// Read original image from `aux`.
+    pub(crate) read_orig: bool,
+    /// Keep original image alive across this pass.
+    pub(crate) keep_orig: bool,
     /// Bokeh Blur's gather: its kernel (`filmcraft_render::vfx::bokeh_kernel`), read as the aux
     /// texture.
-    kernel: Vec<(i32, i32, f32)>,
+    pub(crate) kernel: Vec<(i32, i32, f32)>,
 }
 
-fn step(code: u32, i1: [u32; 4], p: &[f32]) -> Step {
+pub(crate) fn step(code: u32, i1: [u32; 4], p: &[f32]) -> Step {
     let mut q = [0.0; 24];
     for (d, s) in q.iter_mut().zip(p) {
         *d = *s;
     }
-    Step { run: false, code, i1, p: q, combine: false, unsharp_blur: false, kernel: Vec::new() }
+    Step {
+        pipeline: StepPipeline::FxPx,
+        code,
+        i1,
+        p: q,
+        read_orig: false,
+        keep_orig: false,
+        kernel: Vec::new(),
+    }
 }
 
 /// Texels a row of a kernel texture holds.
@@ -149,10 +165,12 @@ fn kernel_texture(device: &wgpu::Device, queue: &wgpu::Queue, kernel: &[(i32, i3
 }
 
 /// Box passes along x (vertical = false) or y for the radii (radius 0 is a no-op on the CPU).
-fn boxes(radii: &[u32], vertical: bool, repeat: bool, out: &mut Vec<Step>) {
+pub(crate) fn boxes(radii: &[u32], vertical: bool, repeat: bool, out: &mut Vec<Step>) {
     for &r in radii.iter().filter(|r| **r > 0) {
         let mut s = step(OP_BOX, [r, repeat as u32, vertical as u32, 0], &[]);
-        s.run = r > BOX_PER_PIXEL_MAX;
+        if r > BOX_PER_PIXEL_MAX {
+            s.pipeline = StepPipeline::FxRun;
+        }
         out.push(s);
     }
 }
@@ -224,10 +242,10 @@ fn steps(op: &FxOp, w: u32, h: u32) -> Vec<Step> {
             boxes(rx, false, true, &mut out);
             boxes(ry, true, true, &mut out);
             for s in &mut out {
-                s.unsharp_blur = true;
+                s.keep_orig = true;
             }
             let mut s = step(OP_UNSHARP, [0; 4], &[*amount, *threshold]);
-            s.combine = true;
+            s.read_orig = true;
             out.push(s);
         }
         FxOp::Crop { x0, x1, y0, y1, feather } => out.push(step(OP_CROP, [0; 4], &[*x0, *x1, *y0, *y1, *feather])),
@@ -343,6 +361,7 @@ fn steps(op: &FxOp, w: u32, h: u32) -> Vec<Step> {
             let spill = spill_suppress.clamp(0.0, 1.0);
             out.push(step(OP_CHROMA_KEY, [dom, 0, 0, 0], &[kcb, kcr, kmag2, tol, gain, pedestal, spill]));
         }
+        FxOp::Node(node_op) => crate::node_fx::push_node_steps(node_op, w, h, &mut out),
     }
     out
 }
@@ -363,6 +382,10 @@ impl FxStage {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("filmcraft-fx"),
             source: wgpu::ShaderSource::Wgsl(include_str!("fx.wgsl").into()),
+        });
+        let node_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("darkworks-node-fx"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("node_fx.wgsl").into()),
         });
         let tex = |binding| wgpu::BindGroupLayoutEntry {
             binding,
@@ -398,11 +421,11 @@ impl FxStage {
             ],
         });
         let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("fx"), bind_group_layouts: &[Some(&bgl)], immediate_size: 0 });
-        let compute = |entry: &str| {
+        let compute = |module: &wgpu::ShaderModule, entry: &str| {
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("fx"),
+                label: Some(entry),
                 layout: Some(&pl),
-                module: &shader,
+                module,
                 entry_point: Some(entry),
                 compilation_options: Default::default(),
                 cache: None,
@@ -429,7 +452,17 @@ impl FxStage {
             multiview_mask: None,
             cache: None,
         });
-        Self { px: compute("fx_px"), run: compute("fx_run"), bgl, source, pool: HashMap::new(), used: HashSet::new(), frames: 0, created: 0 }
+        Self {
+            px: compute(&shader, "fx_px"),
+            run: compute(&shader, "fx_run"),
+            node_px: compute(&node_shader, "node_fx_px"),
+            bgl,
+            source,
+            pool: HashMap::new(),
+            used: HashSet::new(),
+            frames: 0,
+            created: 0,
+        }
     }
 
     /// Start a frame: pooled textures of sizes no layer uses by [`end_frame`](Self::end_frame)
@@ -503,22 +536,21 @@ impl FxStage {
             return None;
         }
         let all: Vec<Step> = fx.ops.iter().flat_map(|op| steps(op, w, h)).collect();
-        let n = if all.iter().any(|s| s.combine) { 3 } else { 2 };
+        let n = if all.iter().any(|s| s.read_orig) { 3 } else { 2 };
         let targets = self.targets(device, (w, h), n);
         let views: Vec<wgpu::TextureView> = targets.iter().map(|t| t.1.clone()).collect();
         let mut dispatches = Vec::with_capacity(all.len());
         let mut cur = 0usize;
-        // Unsharp: the image its blur started from (kept while its blur passes run)
+        // Original source kept untouched while blur/matte passes run
         let mut orig: Option<usize> = None;
         for s in &all {
-            // (an Unsharp without blur passes, radius 0, combines the original with itself)
-            if (s.unsharp_blur || s.combine) && orig.is_none() {
+            if (s.keep_orig || s.read_orig) && orig.is_none() {
                 orig = Some(cur);
             }
-            let keep = if s.unsharp_blur || s.combine { orig } else { None };
+            let keep = if s.keep_orig || s.read_orig { orig } else { None };
             let dst = (0..n).find(|k| *k != cur && Some(*k) != keep)?;
             let kernel = (!s.kernel.is_empty()).then(|| kernel_texture(device, queue, &s.kernel));
-            let aux = match (s.combine, orig, &kernel) {
+            let aux = match (s.read_orig, orig, &kernel) {
                 (true, Some(o), _) => views.get(o)?,
                 (_, _, Some(k)) => k,
                 _ => dummy,
@@ -547,15 +579,15 @@ impl FxStage {
                     wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(aux) },
                 ],
             });
-            let groups = if s.run {
+            let groups = if s.pipeline == StepPipeline::FxRun {
                 let lines = if s.i1[2] != 0 { w } else { h };
                 (lines.div_ceil(64), 1)
             } else {
                 (w.div_ceil(16), h.div_ceil(16))
             };
-            dispatches.push(Dispatch { run: s.run, bg, groups });
+            dispatches.push(Dispatch { pipeline: s.pipeline, bg, groups });
             cur = dst;
-            if s.combine {
+            if s.read_orig && !s.keep_orig {
                 orig = None;
             }
         }
@@ -593,7 +625,12 @@ impl FxStage {
         }
         let mut pass = enc.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("fx"), timestamp_writes: None });
         for d in &job.dispatches {
-            pass.set_pipeline(if d.run { &self.run } else { &self.px });
+            let pipe = match d.pipeline {
+                StepPipeline::FxPx => &self.px,
+                StepPipeline::FxRun => &self.run,
+                StepPipeline::NodePx => &self.node_px,
+            };
+            pass.set_pipeline(pipe);
             pass.set_bind_group(0, &d.bg, &[]);
             pass.dispatch_workgroups(d.groups.0, d.groups.1, 1);
         }

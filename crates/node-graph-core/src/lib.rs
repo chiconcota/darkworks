@@ -10,6 +10,7 @@ pub mod custom_shader;
 pub mod doc;
 pub mod evaluator;
 pub mod node;
+pub mod node_fx_types;
 pub mod preset;
 pub mod types;
 
@@ -18,7 +19,7 @@ pub use doc::{NodeEntry, NodeGraphDoc, NodeWire, VisualGroupDoc};
 pub use evaluator::{DagDocPlan, DagDocStep, DagError, DagEvaluator, EvaluationContext};
 pub use node::{
     ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,
-    ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
+    KeyerMode, KeyerOutput, ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
 };
 pub use preset::{
     NodeGraphPresetDoc, PresetDocError, chain_node_graphs, ensure_preset_extension,

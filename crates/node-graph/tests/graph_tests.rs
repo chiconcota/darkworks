@@ -364,12 +364,7 @@ fn test_18_atomic_nodes_creation_and_sockets() {
         },
         DarkNode::default_blur(BlurType::BokehBloom, 15.0, 0.0, 1.2),
         DarkNode::default_distort(DistortType::RippleWave, 0.8, 1.0, [0.0, 0.0]),
-        DarkNode::Keyer {
-            key_color: [0.0, 1.0, 0.0],
-            similarity: 0.4,
-            smoothness: 0.1,
-            spill_suppress: 0.5,
-        },
+        DarkNode::default_keyer(),
         DarkNode::Transform2D {
             position: [0.0, 0.0],
             scale: [1.0, 1.0],

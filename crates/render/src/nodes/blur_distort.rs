@@ -1,13 +1,14 @@
 //! Xử lý quang học & biến dạng cho `BlurSharpen` và `DistortLens` Nodes.
 
-use darkworks_node_graph_core::{BlurDimensions, BlurType, DistortType};
-use filmcraft_color::luma709;
-use rayon::prelude::*;
+use darkworks_node_graph_core::{
+    BlurDimensions, BlurType, DarkNode, DistortType, EvaluationContext, NodeGraphDoc,
+};
 
-use crate::effects::{box_blur, dec, enc, gaussian_boxes, hash3, mosaic, warp};
+use crate::effects::{box_blur, gaussian_boxes};
 use crate::gpufx::FxOp;
 use crate::image::Image;
-use crate::vfx::fbm;
+use crate::nodes::node_fx_ops::NodeFxOp;
+use crate::nodes::signals::{modulated_scalar, modulated_scalar_mul, modulated_vec2};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_blur_sharpen(
@@ -80,29 +81,9 @@ pub(crate) fn apply_blur_sharpen(
             if strength < 1e-4 {
                 return;
             }
-            let src = img.clone();
-            let (w, h) = (img.w, img.h);
-            let cx = w as f32 * (0.5 + center[0] * 0.5);
-            let cy = h as f32 * (0.5 + center[1] * 0.5);
-            let taps = 16usize;
-            img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
-                let py = y as f32 + 0.5;
-                let dy = cy - py;
-                for x in 0..w {
-                    let px = x as f32 + 0.5;
-                    let dx = cx - px;
-                    let mut acc = [0.0f32; 4];
-                    for s in 0..taps {
-                        let frac = s as f32 / (taps - 1) as f32 * strength;
-                        let p = src.sample_bilinear_clamped(px + dx * frac, py + dy * frac);
-                        for k in 0..4 {
-                            acc[k] += p[k];
-                        }
-                    }
-                    let inv = 1.0 / taps as f32;
-                    row[x * 4..x * 4 + 4].copy_from_slice(&[acc[0] * inv, acc[1] * inv, acc[2] * inv, acc[3] * inv]);
-                }
-            });
+            let cx = img.w as f32 * (0.5 + center[0] * 0.5);
+            let cy = img.h as f32 * (0.5 + center[1] * 0.5);
+            FxOp::Node(NodeFxOp::RadialZoom { strength, cx, cy, taps: 16 }).apply(img);
         }
     }
 }
@@ -130,41 +111,20 @@ pub(crate) fn apply_distort(
             .apply(img);
         }
         DistortType::RippleWave => {
-            let amp = intensity as f64 * 24.0 * scale as f64;
-            let freq = (radius.max(0.05) as f64) * 0.03;
-            let phase = time_sec * std::f64::consts::TAU * 2.0;
-            warp(img, |x, y| {
-                let off_y = amp * (x * freq - phase).sin();
-                (x, y + off_y)
-            });
+            let amp = intensity * 24.0 * scale;
+            let freq = radius.max(0.05) * 0.03;
+            let phase = (time_sec * std::f64::consts::TAU * 2.0) as f32;
+            FxOp::Node(NodeFxOp::RippleWave { amp, freq, phase }).apply(img);
         }
         DistortType::FishEye | DistortType::LensDistortion => {
-            let k = intensity as f64 * if matches!(distort_type, DistortType::FishEye) { 0.45 } else { 0.25 };
-            let cxp = img.w as f64 * (0.5 + center[0] as f64 * 0.5);
-            let cyp = img.h as f64 * (0.5 + center[1] as f64 * 0.5);
-            let norm = (img.w as f64 * 0.5).hypot(img.h as f64 * 0.5).max(1.0);
-            warp(img, |x, y| {
-                let (dx, dy) = ((x - cxp) / norm, (y - cyp) / norm);
-                let r2 = dx * dx + dy * dy;
-                let s = 1.0 - k * r2;
-                (cxp + dx * s * norm, cyp + dy * s * norm)
-            });
+            let k = intensity * if matches!(distort_type, DistortType::FishEye) { 0.45 } else { 0.25 };
+            let cx = img.w as f32 * (0.5 + center[0] * 0.5);
+            let cy = img.h as f32 * (0.5 + center[1] * 0.5);
+            let norm = (img.w as f32 * 0.5).hypot(img.h as f32 * 0.5).max(1.0);
+            FxOp::Node(NodeFxOp::LensDistort { k, cx, cy, norm }).apply(img);
         }
         DistortType::ChromaticAberration => {
-            let shift = intensity * 6.0 * scale;
-            if shift.abs() < 0.1 {
-                return;
-            }
-            let src = img.clone();
-            let w = img.w;
-            img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
-                for x in 0..w {
-                    let r = src.sample_bilinear_clamped(x as f32 + 0.5 + shift, y as f32 + 0.5)[0];
-                    let g_a = src.get(x, y);
-                    let b = src.sample_bilinear_clamped(x as f32 + 0.5 - shift, y as f32 + 0.5)[2];
-                    row[x * 4..x * 4 + 4].copy_from_slice(&[r, g_a[1], b, g_a[3]]);
-                }
-            });
+            FxOp::Node(NodeFxOp::ChromaticAberration { shift: intensity * 6.0 * scale }).apply(img);
         }
         DistortType::Mirror => {
             let rad = (intensity * 180.0).to_radians();
@@ -195,99 +155,219 @@ pub(crate) fn apply_distort(
             FxOp::Posterize { n: levels }.apply(img);
         }
         DistortType::Pixelate => {
-            let block = ((intensity.abs() * 32.0 + radius * 8.0) * scale).round().max(2.0) as usize;
-            mosaic(img, block, block);
+            let block = ((intensity.abs() * 32.0 + radius * 8.0) * scale).round().max(2.0) as u32;
+            FxOp::Node(NodeFxOp::Pixelate { block_w: block, block_h: block }).apply(img);
         }
         DistortType::Twirl => {
-            let ang = (intensity as f64) * std::f64::consts::PI;
-            let rad = (radius.max(0.05) as f64) * 0.5 * (img.w.min(img.h) as f64);
-            let cx = img.w as f64 * (0.5 + center[0] as f64 * 0.5);
-            let cy = img.h as f64 * (0.5 + center[1] as f64 * 0.5);
-            warp(img, |x, y| {
-                let (dx, dy) = (x - cx, y - cy);
-                let d = dx.hypot(dy);
-                if d >= rad {
-                    return (x, y);
-                }
-                let k = 1.0 - d / rad;
-                let (s, c) = (ang * k * k).sin_cos();
-                (cx + dx * c - dy * s, cy + dx * s + dy * c)
-            });
+            let ang = intensity * std::f32::consts::PI;
+            let rad = radius.max(0.05) * 0.5 * (img.w.min(img.h) as f32);
+            let cx = img.w as f32 * (0.5 + center[0] * 0.5);
+            let cy = img.h as f32 * (0.5 + center[1] * 0.5);
+            FxOp::Node(NodeFxOp::Twirl { ang, rad, cx, cy }).apply(img);
         }
         DistortType::TurbulentDisplace => {
-            let amt = intensity as f64 * 42.0 * scale as f64;
-            if amt.abs() < 0.05 {
-                return;
-            }
+            let amt = intensity * 42.0 * scale;
             let size = (radius.max(0.05) * 80.0 * scale).max(4.0);
             let (ox, oy) = (center[0] * 4.0, center[1] * 4.0);
             let evo = time_sec as f32 * 0.6;
-            warp(img, |x, y| {
-                let (u, v) = (x as f32 / size + ox, y as f32 / size + oy);
-                let nx = fbm(u, v, evo, 3.0, 17);
-                let ny = fbm(u + 31.7, v + 12.3, evo + 3.1, 3.0, 17);
-                (x + nx as f64 * amt, y + ny as f64 * amt)
-            });
+            FxOp::Node(NodeFxOp::TurbulentDisplace { amt, size, ox, oy, evo }).apply(img);
         }
         DistortType::FindEdges => {
-            let inv = intensity < 0.0;
-            let blend = feather.clamp(0.0, 1.0);
-            let src = img.clone();
-            let w = img.w;
-            img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
-                for x in 0..w {
-                    let l = |dx: isize, dy: isize| {
-                        let p = src.get_clamped(x as isize + dx, y as isize + dy);
-                        luma709(p[0], p[1], p[2])
-                    };
-                    let gx = l(1, -1) + 2.0 * l(1, 0) + l(1, 1) - l(-1, -1) - 2.0 * l(-1, 0) - l(-1, 1);
-                    let gy = l(-1, 1) + 2.0 * l(0, 1) + l(1, 1) - l(-1, -1) - 2.0 * l(0, -1) - l(1, -1);
-                    let mut m = (gx * gx + gy * gy).sqrt().min(1.0);
-                    if !inv {
-                        m = 1.0 - m;
-                    }
-                    let o = src.get(x, y);
-                    let a = o[3];
-                    for k in 0..3 {
-                        row[x * 4 + k] = m * a * (1.0 - blend) + o[k] * blend;
-                    }
-                }
-            });
+            FxOp::Node(NodeFxOp::FindEdges {
+                invert: intensity < 0.0,
+                blend: feather.clamp(0.0, 1.0),
+            })
+            .apply(img);
         }
         DistortType::NoiseGrain => {
             let amt = intensity.abs().clamp(0.0, 2.0) * 0.35;
-            if amt < 1e-4 {
-                return;
-            }
             let grain = (radius.max(0.25) * 4.0 * scale).max(1.0);
             let color_mix = feather.clamp(0.0, 1.0);
-            let frame_seed = (time_sec * 60.0).round() as u64;
-            let w = img.w;
-            img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
-                for x in 0..w {
-                    let p = &mut row[x * 4..x * 4 + 4];
-                    let a = p[3];
-                    if a <= 0.0 {
-                        continue;
-                    }
-                    let (gx, gy) = ((x as f32 / grain) as usize, (y as f32 / grain) as usize);
-                    let n0 = hash3(gx, gy, frame_seed) - 0.5;
-                    let ns = [
-                        n0,
-                        n0 + (hash3(gx, gy, frame_seed + 7777) - 0.5 - n0) * color_mix,
-                        n0 + (hash3(gx, gy, frame_seed + 99_991) - 0.5 - n0) * color_mix,
-                    ];
-                    let c = enc([p[0] / a, p[1] / a, p[2] / a]);
-                    let o = dec([
-                        (c[0] + ns[0] * amt).clamp(0.0, 1.0),
-                        (c[1] + ns[1] * amt).clamp(0.0, 1.0),
-                        (c[2] + ns[2] * amt).clamp(0.0, 1.0),
-                    ]);
-                    p[0] = o[0] * a;
-                    p[1] = o[1] * a;
-                    p[2] = o[2] * a;
-                }
+            let seed = (time_sec * 60.0).round() as u32;
+            FxOp::Node(NodeFxOp::NoiseGrain { amt, grain, color_mix, seed }).apply(img);
+        }
+    }
+}
+
+/// Biên dịch `DarkNode::BlurSharpen` thành chuỗi [`FxOp`] chạy GPU.
+pub(crate) fn push_blur_gpu_ops(
+    doc: &NodeGraphDoc,
+    sig_ctx: &EvaluationContext,
+    id: usize,
+    node: &DarkNode,
+    size: [usize; 2],
+    px_scale: f32,
+    ops: &mut Vec<FxOp>,
+) {
+    let DarkNode::BlurSharpen {
+        blur_type,
+        radius,
+        angle_deg,
+        highlight_boost,
+        threshold,
+        dimensions,
+        repeat_edge,
+        bokeh_sides,
+        center,
+    } = node
+    else {
+        return;
+    };
+    let [lw, lh] = size;
+    let eff_r = (modulated_scalar_mul(doc, sig_ctx, id, 1, *radius) * px_scale).max(0.0);
+    if eff_r < 0.1 {
+        return;
+    }
+    let (rx_on, ry_on) = match dimensions {
+        BlurDimensions::Both => (eff_r, eff_r),
+        BlurDimensions::Horizontal => (eff_r, 0.0),
+        BlurDimensions::Vertical => (0.0, eff_r),
+    };
+    match blur_type {
+        BlurType::Gaussian => {
+            let (rx, ry) = gaussian_boxes(lw, lh, rx_on, ry_on);
+            ops.push(FxOp::Gaussian { rx, ry, repeat: *repeat_edge });
+        }
+        BlurType::Box => {
+            let b = (eff_r.round() as u32).max(1);
+            ops.push(FxOp::Gaussian {
+                rx: if rx_on > 0.0 { vec![b] } else { Vec::new() },
+                ry: if ry_on > 0.0 { vec![b] } else { Vec::new() },
+                repeat: *repeat_edge,
             });
+        }
+        BlurType::Directional => {
+            let rad = angle_deg.to_radians();
+            let steps = ((eff_r * 0.75).round() as u32).clamp(9, 25);
+            ops.push(FxOp::DirectionalBlur { dx: rad.cos() * eff_r, dy: rad.sin() * eff_r, steps });
+        }
+        BlurType::BokehBloom => ops.push(FxOp::Bokeh {
+            levels: 2,
+            boost: highlight_boost.max(0.0),
+            threshold: threshold.clamp(0.0, 1.0),
+            sides: u32::from((*bokeh_sides).min(8)),
+            rot: angle_deg.to_radians(),
+            rr: eff_r,
+            rings: 3,
+        }),
+        BlurType::UnsharpMask => {
+            let (rx, ry) = gaussian_boxes(lw, lh, eff_r, eff_r);
+            ops.push(FxOp::Unsharp {
+                rx,
+                ry,
+                amount: highlight_boost.max(0.2),
+                threshold: (*threshold * 0.2).clamp(0.0, 0.5),
+            });
+        }
+        BlurType::RadialZoom => {
+            let raw_r = modulated_scalar_mul(doc, sig_ctx, id, 1, *radius);
+            let strength = (raw_r / 100.0).clamp(0.0, 1.5) * 0.45;
+            if strength >= 1e-4 {
+                ops.push(FxOp::Node(NodeFxOp::RadialZoom {
+                    strength,
+                    cx: lw as f32 * (0.5 + center[0] * 0.5),
+                    cy: lh as f32 * (0.5 + center[1] * 0.5),
+                    taps: 16,
+                }));
+            }
+        }
+    }
+}
+
+/// Biên dịch `DarkNode::DistortLens` thành chuỗi [`FxOp`] chạy GPU.
+pub(crate) fn push_distort_gpu_ops(
+    doc: &NodeGraphDoc,
+    sig_ctx: &EvaluationContext,
+    id: usize,
+    node: &DarkNode,
+    size: [usize; 2],
+    scale_time: (f32, f64),
+    ops: &mut Vec<FxOp>,
+) {
+    let DarkNode::DistortLens { distort_type, intensity, radius, center, feather } = node else {
+        return;
+    };
+    let [lw, lh] = size;
+    let (px_scale, time_sec) = scale_time;
+    let eff_int = modulated_scalar(doc, sig_ctx, id, 1, *intensity);
+    let eff_center = modulated_vec2(doc, sig_ctx, id, 2, *center);
+    let cx = lw as f32 * (0.5 + eff_center[0] * 0.5);
+    let cy = lh as f32 * (0.5 + eff_center[1] * 0.5);
+    match distort_type {
+        DistortType::Vignette => ops.push(FxOp::Vignette {
+            amount: eff_int,
+            midpoint: radius.clamp(0.0, 1.0),
+            roundness: 0.0,
+            feather: feather.clamp(0.01, 1.0),
+            target: [0.0, 0.0, 0.0],
+        }),
+        DistortType::Mirror => {
+            let rad = (eff_int * 180.0).to_radians();
+            ops.push(FxOp::Mirror { cx, cy, nx: rad.cos(), ny: rad.sin() });
+        }
+        DistortType::Offset => {
+            let (wf, hf) = (lw.max(1) as f32, lh.max(1) as f32);
+            ops.push(FxOp::Offset {
+                dx: (eff_center[0] * wf * 0.5).rem_euclid(wf),
+                dy: (eff_center[1] * hf * 0.5).rem_euclid(hf),
+                blend: (1.0 - feather).clamp(0.0, 1.0),
+            });
+        }
+        DistortType::Posterize => ops.push(FxOp::Posterize {
+            n: (2.0 + eff_int.abs() * 14.0).clamp(2.0, 64.0),
+        }),
+        DistortType::Pixelate => {
+            let block = ((eff_int.abs() * 32.0 + radius * 8.0) * px_scale).round().max(2.0) as u32;
+            ops.push(FxOp::Node(NodeFxOp::Pixelate { block_w: block, block_h: block }));
+        }
+        DistortType::ChromaticAberration => {
+            let shift = eff_int * 6.0 * px_scale;
+            if shift.abs() >= 0.1 {
+                ops.push(FxOp::Node(NodeFxOp::ChromaticAberration { shift }));
+            }
+        }
+        DistortType::RippleWave => ops.push(FxOp::Node(NodeFxOp::RippleWave {
+            amp: eff_int * 24.0 * px_scale,
+            freq: radius.max(0.05) * 0.03,
+            phase: (time_sec * std::f64::consts::TAU * 2.0) as f32,
+        })),
+        DistortType::FishEye | DistortType::LensDistortion => {
+            let k = eff_int * if matches!(distort_type, DistortType::FishEye) { 0.45 } else { 0.25 };
+            let norm = (lw as f32 * 0.5).hypot(lh as f32 * 0.5).max(1.0);
+            ops.push(FxOp::Node(NodeFxOp::LensDistort { k, cx, cy, norm }));
+        }
+        DistortType::Twirl => ops.push(FxOp::Node(NodeFxOp::Twirl {
+            ang: eff_int * std::f32::consts::PI,
+            rad: radius.max(0.05) * 0.5 * (lw.min(lh) as f32),
+            cx,
+            cy,
+        })),
+        DistortType::FindEdges => ops.push(FxOp::Node(NodeFxOp::FindEdges {
+            invert: eff_int < 0.0,
+            blend: feather.clamp(0.0, 1.0),
+        })),
+        DistortType::NoiseGrain => {
+            let amt = eff_int.abs().clamp(0.0, 2.0) * 0.35;
+            if amt >= 1e-4 {
+                ops.push(FxOp::Node(NodeFxOp::NoiseGrain {
+                    amt,
+                    grain: (radius.max(0.25) * 4.0 * px_scale).max(1.0),
+                    color_mix: feather.clamp(0.0, 1.0),
+                    seed: (time_sec * 60.0).round() as u32,
+                }));
+            }
+        }
+        DistortType::TurbulentDisplace => {
+            let amt = eff_int * 42.0 * px_scale;
+            if amt.abs() >= 0.05 {
+                ops.push(FxOp::Node(NodeFxOp::TurbulentDisplace {
+                    amt,
+                    size: (radius.max(0.05) * 80.0 * px_scale).max(4.0),
+                    ox: eff_center[0] * 4.0,
+                    oy: eff_center[1] * 4.0,
+                    evo: time_sec as f32 * 0.6,
+                }));
+            }
         }
     }
 }

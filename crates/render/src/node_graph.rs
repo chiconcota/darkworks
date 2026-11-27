@@ -14,7 +14,7 @@ use filmcraft_time::Tick;
 use crate::blend::composite;
 use crate::gpufx::FxOp;
 use crate::image::Image;
-use crate::nodes::color::ColorGradeParams;
+use crate::nodes::color::{ColorGradeParams, KeyerProParams};
 use crate::nodes::{
     apply_blur_sharpen, apply_color_grade, apply_distort, apply_keyer, apply_mask_alpha,
     apply_transform, apply_transition, compute_audio_rms_map, count_wire_uses, map_blend,
@@ -99,7 +99,7 @@ pub(crate) fn eval_item_graph_inner(
     let sy = h as f32 / seq.settings.height.max(1) as f32;
     let scale_xy = (sx, sy);
 
-    let mut textures: HashMap<usize, Image> = HashMap::new();
+    let mut textures: HashMap<(usize, usize), Image> = HashMap::new();
     let mut use_counts = count_wire_uses(doc);
     let mut final_output: Option<Image> = None;
 
@@ -285,9 +285,56 @@ pub(crate) fn eval_item_graph_inner(
                 similarity,
                 smoothness,
                 spill_suppress,
+                mode,
+                output,
+                pedestal,
+                highlight,
+                shadow,
+                choke,
+                soften,
+                matte_contrast,
+                invert_matte,
+                desaturate,
+                spill_luma,
+                luma_threshold,
+                luma_cutoff,
             } => {
                 let mut img = take_or_clone_texture(doc, &mut textures, &mut use_counts, id, 0, w, h);
-                apply_keyer(&mut img, *key_color, *similarity, *smoothness, *spill_suppress);
+                let gm = doc
+                    .source_for_pin(id, 1)
+                    .map(|_| take_or_clone_texture(doc, &mut textures, &mut use_counts, id, 1, w, h));
+                let need_matte_out = use_counts.get(&(id, 1)).copied().unwrap_or(0) > 0;
+                let matte_out = apply_keyer(
+                    &mut img,
+                    &KeyerProParams {
+                        key_color: *key_color,
+                        similarity: *similarity,
+                        smoothness: *smoothness,
+                        spill_suppress: *spill_suppress,
+                        mode: *mode,
+                        output: *output,
+                        pedestal: *pedestal,
+                        highlight: *highlight,
+                        shadow: *shadow,
+                        choke: *choke,
+                        soften: *soften,
+                        matte_contrast: *matte_contrast,
+                        invert_matte: *invert_matte,
+                        desaturate: *desaturate,
+                        spill_luma: *spill_luma,
+                        luma_threshold: *luma_threshold,
+                        luma_cutoff: *luma_cutoff,
+                        px_scale: opts.scale,
+                    },
+                    gm.as_ref(),
+                    need_matte_out,
+                );
+                if let Some(gm_img) = gm {
+                    recycle_f32(gm_img.px);
+                }
+                if let Some(m) = matte_out {
+                    textures.insert((id, 1), m);
+                }
                 Some(img)
             }
             DarkNode::Transform2D {
@@ -394,7 +441,7 @@ pub(crate) fn eval_item_graph_inner(
         };
 
         if let Some(img) = out_img {
-            textures.insert(id, img);
+            textures.insert((id, 0), img);
         }
     }
 
@@ -403,7 +450,7 @@ pub(crate) fn eval_item_graph_inner(
         plan.steps
             .iter()
             .rev()
-            .find_map(|s| textures.remove(&s.node_id))
+            .find_map(|s| textures.remove(&(s.node_id, 0)))
     });
     for (_, img) in textures {
         recycle_f32(img.px);

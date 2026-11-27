@@ -1,6 +1,9 @@
 //! Cầu nối đồng bộ giữa Node Graph (`Snarl<DarkNode>`), Timeline (`TrackItem`) và Program Monitor.
 
-use darkworks_node_graph::{DarkNode, doc_from_snarl, snarl_from_doc};
+use darkworks_node_graph::node_controls::{
+    NodeEyedropperActive, NodeEyedropperRequest, eyedropper_active_id, eyedropper_request_id,
+};
+use darkworks_node_graph::{DarkNode, NodeDataType, doc_from_snarl, snarl_from_doc};
 use darkworks_node_graph_core::ActionScope;
 use egui::{Color32, RichText, Ui};
 use filmcraft_engine::project::ClipId;
@@ -238,5 +241,151 @@ pub fn process_action_nodes_and_live_sync(app: &mut FilmcraftApp, ui: &Ui, state
         {
             state.last_synced_doc = Some(current_doc);
         }
+    }
+}
+
+/// Đồng bộ trạng thái nút Eyedropper đang bật xuống `egui::Context` trước khi vẽ Canvas Node.
+pub fn publish_eyedropper_active(app: &FilmcraftApp, ctx: &egui::Context) {
+    if let Some(crate::state::Eyedropper::NodeGraph { node_idx, param, .. }) = &app.ui.eyedropper {
+        ctx.data_mut(|d| {
+            d.insert_temp(
+                eyedropper_active_id(),
+                NodeEyedropperActive {
+                    node_id: egui_snarl::NodeId(*node_idx),
+                    param: param.clone(),
+                },
+            );
+        });
+    } else {
+        ctx.data_mut(|d| {
+            d.remove::<NodeEyedropperActive>(eyedropper_active_id());
+        });
+    }
+}
+
+/// Tiếp nhận cú click vào nút Eyedropper trên bất kỳ Node có bảng màu nào.
+pub fn consume_eyedropper_request(app: &mut FilmcraftApp, ctx: &egui::Context, state: &mut NodeGraphState) {
+    let req = ctx.data_mut(|d| {
+        let r = d.get_temp::<NodeEyedropperRequest>(eyedropper_request_id());
+        if r.is_some() {
+            d.remove::<NodeEyedropperRequest>(eyedropper_request_id());
+        }
+        r
+    });
+    let Some(req) = req else { return };
+    let clip = state.bound_clip_id.map(|c| c.0);
+    let already = matches!(
+        &app.ui.eyedropper,
+        Some(crate::state::Eyedropper::NodeGraph { node_idx, param, .. })
+            if *node_idx == req.node_id.0 && param == req.param
+    );
+    if already {
+        app.ui.eyedropper = None;
+        state.status_message = "Đã tắt Eyedropper".to_string();
+    } else {
+        let bypass_node = req.param == "keyer.key_color";
+        app.ui.eyedropper = Some(crate::state::Eyedropper::NodeGraph {
+            clip,
+            node_idx: req.node_id.0,
+            param: req.param.to_string(),
+            bypass_node,
+        });
+        state.status_message = "🎯 Eyedropper đã bật: click vào Program Monitor để hút màu (Esc hủy)".to_string();
+    }
+}
+
+/// Tạm thay thế node `Keyer` bằng `Reroute` trên bản sao `Project` để lấy mẫu đúng màu phông gốc.
+pub fn bypass_node_in_project(
+    ctx: &egui::Context,
+    seq: filmcraft_project::ItemId,
+    clip_id: u64,
+    node_idx: usize,
+    project: &mut filmcraft_project::Project,
+) {
+    crate::panels::node_graph::with_state(ctx, |state| {
+        let mut temp_snarl = state.snarl.clone();
+        if let Some(n) = temp_snarl.get_node_mut(egui_snarl::NodeId(node_idx)) {
+            *n = DarkNode::Reroute {
+                data_type: NodeDataType::Texture,
+            };
+        }
+        let doc = doc_from_snarl(&temp_snarl, &state.groups, &state.custom_titles);
+        if let Some((_, item)) = project.sequence_mut(seq).and_then(|s| s.find_item_mut(ClipId(clip_id))) {
+            item.node_graph = Some(Box::new(doc));
+        }
+    });
+}
+
+/// Áp màu hút được từ Program Monitor vào đúng tham số của Node (cả Clip gắn sẵn lẫn Nháp).
+pub fn apply_eyedropper_color(
+    ctx: &egui::Context,
+    app: &mut FilmcraftApp,
+    clip: Option<u64>,
+    node_idx: usize,
+    param: &str,
+    rgb: [u8; 3],
+) {
+    let c = [
+        f32::from(rgb[0]) / 255.0,
+        f32::from(rgb[1]) / 255.0,
+        f32::from(rgb[2]) / 255.0,
+    ];
+    let mut updated_doc: Option<(ClipId, darkworks_node_graph_core::NodeGraphDoc)> = None;
+    crate::panels::node_graph::with_state(ctx, |state| {
+        state.push_undo();
+        if let Some(node) = state.snarl.get_node_mut(egui_snarl::NodeId(node_idx)) {
+            match (node, param) {
+                (DarkNode::Keyer { key_color, .. }, "keyer.key_color") => *key_color = c,
+                (DarkNode::ColorGrade { tint_color, .. }, "color.tint_color") => {
+                    tint_color[0] = c[0];
+                    tint_color[1] = c[1];
+                    tint_color[2] = c[2];
+                }
+                (DarkNode::ColorGrade { shadow_tint, .. }, "color.shadow_tint") => *shadow_tint = c,
+                (DarkNode::ColorGrade { highlight_tint, .. }, "color.highlight_tint") => *highlight_tint = c,
+                (DarkNode::TextGenerator { color, .. }, "text.color") => {
+                    color[0] = c[0];
+                    color[1] = c[1];
+                    color[2] = c[2];
+                }
+                (DarkNode::TextGenerator { stroke_color, .. }, "text.stroke_color") => {
+                    stroke_color[0] = c[0];
+                    stroke_color[1] = c[1];
+                    stroke_color[2] = c[2];
+                }
+                (DarkNode::ShapeGenerator { color, .. }, "shape.color") => {
+                    color[0] = c[0];
+                    color[1] = c[1];
+                    color[2] = c[2];
+                }
+                (DarkNode::ShapeGenerator { stroke_color, .. }, "shape.stroke_color") => {
+                    stroke_color[0] = c[0];
+                    stroke_color[1] = c[1];
+                    stroke_color[2] = c[2];
+                }
+                _ => {}
+            }
+            state.status_message = format!(
+                "✔ Đã hút màu #{:02X}{:02X}{:02X} vào {param}",
+                rgb[0], rgb[1], rgb[2]
+            );
+            if let Some(cid) = clip
+                && state.bound_clip_id == Some(ClipId(cid))
+            {
+                let doc = doc_from_snarl(&state.snarl, &state.groups, &state.custom_titles);
+                updated_doc = Some((ClipId(cid), doc));
+            }
+        }
+    });
+    if let Some((cid, doc)) = updated_doc
+        && let Ok(graph_json) = serde_json::to_value(&doc)
+        && app
+            .session
+            .execute("nodeGraph.setOnClip", json!({ "clip": cid.0, "graph": graph_json }))
+            .is_ok()
+    {
+        crate::panels::node_graph::with_state(ctx, |state| {
+            state.last_synced_doc = Some(doc);
+        });
     }
 }

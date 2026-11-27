@@ -294,3 +294,49 @@ fn audio_reactor_a2_bass_drives_color_grade_exposure_visibly() {
     let silence_luma = eval_item_graph(&p, seq, &video_ti, Tick::from_seconds_f64(3.0), RenderOptions::default(), &provider, Some(&clip_img), None).expect("silence").get(8, 8)[0];
     assert!(beat_luma > silence_luma * 2.0, "bass beat ({beat_luma}) must brighten video > 2x vs silence ({silence_luma})");
 }
+
+#[test]
+fn keyer_garbage_matte_and_matte_out_pin_work() {
+    use darkworks_node_graph_core::{KeyerMode, ShapeType};
+    use filmcraft_project::SequenceSettings;
+
+    let mut p = Project::new("keyer-matte-test");
+    let seq_id = p.new_sequence("s", SequenceSettings { width: 32, height: 32, ..Default::default() }, 1, 0, None);
+    let mut item: TrackItem = serde_json::from_value(serde_json::json!({
+        "id": 99, "item": 1, "name": "v1", "label": "Iris", "start": 0, "duration": 1_000_000_000i64, "source_in": 0,
+        "speed": 1.0, "enabled": true, "effects": []
+    })).expect("track item");
+
+    let mut keyer = DarkNode::default_keyer();
+    if let DarkNode::Keyer { mode, luma_threshold, luma_cutoff, .. } = &mut keyer {
+        *mode = KeyerMode::LumaKey;
+        *luma_threshold = 0.2;
+        *luma_cutoff = 0.2;
+    }
+    item.node_graph = Some(Box::new(NodeGraphDoc {
+        nodes: vec![
+            NodeEntry { id: 0, pos: [0.0, 0.0], node: DarkNode::VideoInput { track_name: "Auto".into() }, custom_title: None },
+            NodeEntry {
+                id: 1,
+                pos: [0.0, 120.0],
+                node: DarkNode::default_shape(ShapeType::Rectangle, [10.0, 10.0], 0.0, [1.0, 1.0, 1.0, 1.0]),
+                custom_title: None,
+            },
+            NodeEntry { id: 2, pos: [200.0, 0.0], node: keyer, custom_title: None },
+            NodeEntry { id: 3, pos: [400.0, 0.0], node: DarkNode::Output, custom_title: None },
+        ],
+        wires: vec![
+            NodeWire { out_node: 0, out_pin: 0, in_node: 2, in_pin: 0 },
+            NodeWire { out_node: 1, out_pin: 0, in_node: 2, in_pin: 1 },
+            NodeWire { out_node: 2, out_pin: 1, in_node: 3, in_pin: 0 }, // Matte Out!
+        ],
+        groups: Vec::new(),
+    }));
+    let seq = p.sequence_mut(seq_id).expect("seq");
+    seq.video_tracks[0].items.push(item.clone());
+    let clip_img = Image::filled(32, 32, [0.9, 0.9, 0.9, 1.0]);
+    let seq = p.sequence(seq_id).expect("seq");
+    let out = eval_item_graph(&p, seq, &item, Tick::ZERO, RenderOptions::default(), &|_| None, Some(&clip_img), None).expect("matte out");
+    assert!(out.get(16, 16)[3] > 0.99, "inside garbage matte stays white/opaque");
+    assert!(out.get(1, 1)[3] < 0.01, "outside garbage matte is clipped out");
+}

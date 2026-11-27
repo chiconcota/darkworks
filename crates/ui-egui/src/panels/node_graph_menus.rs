@@ -55,12 +55,7 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
         }
         if ui.button("🟢 Ultra Keyer").clicked() {
             state.push_undo();
-            state.snarl.insert_node(Pos2::new(200.0, 100.0), DarkNode::Keyer {
-                key_color: [0.0, 1.0, 0.0],
-                similarity: 0.4,
-                smoothness: 0.1,
-                spill_suppress: 0.5,
-            });
+            state.snarl.insert_node(Pos2::new(200.0, 100.0), DarkNode::default_keyer());
             ui.close();
         }
 

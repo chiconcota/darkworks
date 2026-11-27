@@ -203,7 +203,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
 
         ui.menu_button("🎨 Color & Keying", |ui| {
             if ui.button("🎨 Color Grade").clicked() { snarl.insert_node(pos, DarkNode::default_color_grade()); ui.close(); }
-            if ui.button("🟢 Ultra Keyer").clicked() { snarl.insert_node(pos, DarkNode::Keyer { key_color: [0.0, 1.0, 0.0], similarity: 0.4, smoothness: 0.1, spill_suppress: 0.5 }); ui.close(); }
+            if ui.button("🟢 Ultra Keyer").clicked() { snarl.insert_node(pos, DarkNode::default_keyer()); ui.close(); }
         });
 
         ui.menu_button("📐 Transform & Motion", |ui| {
@@ -417,8 +417,9 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
             DarkNode::TextGenerator { .. }
             | DarkNode::ShapeGenerator { .. }
             | DarkNode::CropMask { .. }
-            | DarkNode::Keyer { .. }
             | DarkNode::Output => 1,
+
+            DarkNode::Keyer { .. } => 2, // 0: Texture, 1: Garbage Matte (tùy chọn)
 
             DarkNode::ColorGrade { .. }
             | DarkNode::BlurSharpen { .. } => 2, // 0: Texture, 1: Mod (Scalar)
@@ -438,7 +439,8 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         match node {
             DarkNode::Output | DarkNode::StickyNote { .. } => 0,
             DarkNode::TimeDriver { .. }
-            | DarkNode::AudioReactor { .. } => 2, // 0: Scalar/AudioFloat, 1: Vec2 Out
+            | DarkNode::AudioReactor { .. }
+            | DarkNode::Keyer { .. } => 2, // Keyer: 0 = Texture Out, 1 = Matte Out
 
             DarkNode::VideoInput { .. }
             | DarkNode::TextGenerator { .. }
@@ -450,7 +452,6 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
             | DarkNode::BlurSharpen { .. }
             | DarkNode::DistortLens { .. }
             | DarkNode::Transition { .. }
-            | DarkNode::Keyer { .. }
             | DarkNode::CustomWgsl { .. }
             | DarkNode::Reroute { .. } => 1,
 
@@ -485,9 +486,11 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
                 0 => ("Image In", NodeDataType::Texture),
                 _ => ("Radius Mod", NodeDataType::Scalar),
             },
-            DarkNode::CropMask { .. }
-            | DarkNode::Keyer { .. }
-            | DarkNode::Output => ("Image In", NodeDataType::Texture),
+            DarkNode::CropMask { .. } | DarkNode::Output => ("Image In", NodeDataType::Texture),
+            DarkNode::Keyer { .. } => match pin.id.input {
+                0 => ("Image In", NodeDataType::Texture),
+                _ => ("Garbage Matte", NodeDataType::Texture),
+            },
 
             DarkNode::DistortLens { .. } => match pin.id.input {
                 0 => ("Image In", NodeDataType::Texture),
@@ -542,8 +545,11 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
             | DarkNode::BlurSharpen { .. }
             | DarkNode::DistortLens { .. }
             | DarkNode::Transition { .. }
-            | DarkNode::Keyer { .. }
             | DarkNode::CustomWgsl { .. } => ("Texture Out", NodeDataType::Texture),
+            DarkNode::Keyer { .. } => match pin.id.output {
+                0 => ("Texture Out", NodeDataType::Texture),
+                _ => ("Matte Out", NodeDataType::Texture),
+            },
 
             DarkNode::TimeDriver { .. } => match pin.id.output {
                 0 => ("Time Value", NodeDataType::Scalar),
@@ -587,6 +593,6 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         snarl: &mut Snarl<DarkNode>,
     ) {
         let node = &mut snarl[node_id];
-        crate::node_controls::render_node_body(node, ui);
+        crate::node_controls::render_node_body_for(node_id, node, ui);
     }
 }

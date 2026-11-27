@@ -27,7 +27,7 @@ pub mod mask;
 pub mod mixer;
 pub mod multicam;
 pub mod node_graph;
-mod nodes;
+pub mod nodes;
 pub mod offline;
 pub mod plan;
 pub mod preview;

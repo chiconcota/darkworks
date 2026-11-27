@@ -124,7 +124,7 @@ flowchart TD
 **Mục tiêu:** Đưa engine đồ họa vector Vello + Cosmic-text vào mạng lưới Node Graph để tạo chữ Karaoke nhảy màu, biểu đồ, infographic vẽ trực tiếp bằng Compute Shader trên VRAM GPU (Zero-Copy), không nhúng Web Browser tiết kiệm 1GB RAM; đồng thời bổ sung **Hệ thống Keyframe & `KeyframeCurve` Node** theo `Tick` để kiểm soát chính xác hoạt ảnh theo thời gian song song với Procedural Motion.
 
 - [ ] **Task 4.1 [Vello Compute Pipeline]:**
-  - Tích hợp `vello` và `cosmic-text` làm Generator Node trong đồ thị Node Graph, render vector thẳng sang `wgpu::Texture`.
+  - Tích hợp `vello` và `cosmic-text` làm Generator Node trong đồ thị Node Graph, render vector thẳng sang `wgpu::Texture` (đưa cả `TextGenerator` & `ShapeGenerator` từ CPU rasterizer lên Compute Shader GPU).
 - [ ] **Task 4.2 [Node Text & Subtitle Karaoke]:**
   - Node văn bản: Chọn font, kích cỡ, màu sắc, viền nét (stroke), căn lề.
   - Chế độ Karaoke: Đổi màu từng chữ theo nhịp giọng nói dựa trên đơn vị `Tick`.
@@ -142,7 +142,10 @@ flowchart TD
   - Nối thao tác kéo thả khung Transform trên Program Monitor (`transform_handles.rs`) trực tiếp vào `Transform2D` Node (hỗ trợ đặt keyframe `Position`/`Scale`/`Rotation` thẳng vào Node Graph).
   - Đóng gói trọn bộ hiệu ứng Video & Color Grading phổ biến của FilmCraft thành kho **Node Graph Presets (`.preset.json`) lưu sẵn** (Blur, Glow, Vignette, Color Presets, Blur/Distort, Motion Pop-in/out…).
   - Ẩn tab `Effect Controls` và mục `Video Effects` cũ khỏi workspace UI mặc định để chuyển người dùng sang quy trình **Thư viện Node Presets + Node Graph** (vẫn giữ Audio FX & Transition điểm nối cho tới Phase 5).
-- **Tiêu chuẩn nghiệm thu (DoD 4):** Phụ đề Karaoke nhảy màu theo giọng nói mượt mà 60fps; phóng to vector không vỡ hạt; đặt được keyframe mượt (Linear/Ease) theo Playhead cho tham số Node lẫn dùng `KeyframeCurve` Node cắm dây điều khiển nhiều Node cùng lúc; kéo khung Transform trên Program Monitor ăn thẳng vào `Transform2D` Node; kho Video Presets lưu sẵn áp 1-click thay thế `Video Effects` & `Effect Controls` cũ.
+- [ ] **Task 4.8 [Multi-Branch GPU DAG Texture Pool & Zero-Readback `CustomWgsl`]:**
+  - Nâng cấp bộ thực thi từ pipeline tuyến tính 1 luồng (`gpu_plan.rs` / `LayerFx`) lên **DAG Multi-Texture Pool trên GPU** (`crates/gpu` + `crates/render`), giúp các đồ thị rẽ nhánh nhiều luồng song song (vd: `Cinematic Soft Glow`, `Spotlight Invert`, `Keyer` nối `Garbage Matte` động từ `ShapeGenerator`) chạy 100% trên VRAM không rơi về `eval_item_graph` CPU.
+  - Chuyển **`CustomWgsl` (`crates/gpu/src/custom_wgsl.rs`) sang Zero-Readback**: giữ kết quả texture trung gian trực tiếp trên GPU VRAM khi nối tiếp với các Node GPU khác thay vì đọc ngược pixel về `Image` CPU.
+- **Tiêu chuẩn nghiệm thu (DoD 4):** Phụ đề Karaoke nhảy màu theo giọng nói mượt mà 60fps; `TextGenerator`/`ShapeGenerator` & đồ thị DAG rẽ nhánh nhiều lớp chạy 100% VRAM không readback CPU; đặt được keyframe mượt (Linear/Ease) theo Playhead cho tham số Node lẫn dùng `KeyframeCurve` Node cắm dây điều khiển nhiều Node cùng lúc; kéo khung Transform trên Program Monitor ăn thẳng vào `Transform2D` Node; kho Video Presets lưu sẵn áp 1-click thay thế `Video Effects` & `Effect Controls` cũ.
 
 ---
 

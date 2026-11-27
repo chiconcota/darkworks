@@ -5,7 +5,8 @@
 
 use std::sync::OnceLock;
 
-use egui::{ComboBox, CursorIcon, DragValue, Grid, Response, TextEdit, Ui};
+use egui::{Color32, ComboBox, CursorIcon, DragValue, Grid, Pos2, Response, Stroke, TextEdit, Ui, vec2};
+use egui_snarl::NodeId;
 use crate::node::{
     ActionScope, AudioBand, BlendMode, DarkNode, ShapeType, TextAlign, TimeMode,
 };
@@ -65,15 +66,94 @@ pub fn btn(ui: &mut Ui, text: &str) -> Response {
     r
 }
 
-pub(crate) fn color_picker_rgba(ui: &mut Ui, color: &mut [f32; 4]) {
-    let r = ui.color_edit_button_rgba_unmultiplied(color);
-    if r.hovered() {
+/// Yêu cầu kích hoạt Eyedropper phát sinh từ nút bấm trên Node UI.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeEyedropperRequest {
+    pub node_id: NodeId,
+    pub param: &'static str,
+}
+
+/// Trạng thái Eyedropper đang bật để tô sáng nút ống hút trên Node UI.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeEyedropperActive {
+    pub node_id: NodeId,
+    pub param: String,
+}
+
+#[must_use]
+pub fn eyedropper_request_id() -> egui::Id {
+    egui::Id::unique("darkworks-node-eyedropper-req")
+}
+
+#[must_use]
+pub fn eyedropper_active_id() -> egui::Id {
+    egui::Id::unique("darkworks-node-eyedropper-active")
+}
+
+fn draw_eyedropper_btn(ui: &mut Ui, node_id: NodeId, param: &'static str) {
+    let active = ui
+        .ctx()
+        .data(|d| d.get_temp::<NodeEyedropperActive>(eyedropper_active_id()))
+        .is_some_and(|a| a.node_id == node_id && a.param == param);
+    let (rect, resp) = ui.allocate_exact_size(vec2(18.0, 18.0), egui::Sense::click());
+    if resp.hovered() {
         ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
     }
+    if ui.is_rect_visible(rect) {
+        let p = ui.painter();
+        let bg = if active {
+            Color32::from_rgb(0, 165, 220)
+        } else if resp.hovered() {
+            Color32::from_gray(72)
+        } else {
+            Color32::from_gray(46)
+        };
+        p.rect_filled(rect, 3.0, bg);
+        let fg = if active { Color32::BLACK } else { Color32::from_gray(230) };
+        let c = rect.center();
+        // Vẽ ống hút màu vector nghiêng 45°
+        p.line_segment([c + vec2(-4.5, 4.5), c + vec2(1.5, -1.5)], Stroke::new(1.6, fg));
+        p.line_segment([c + vec2(0.0, -3.0), c + vec2(3.0, 0.0)], Stroke::new(1.4, fg));
+        p.line_segment([c + vec2(1.5, -1.5), c + vec2(4.2, -4.2)], Stroke::new(2.2, fg));
+        p.circle_filled(Pos2::new(c.x - 4.8, c.y + 4.8), 1.0, fg);
+    }
+    let resp = resp.on_hover_text("Hút màu từ Program Monitor (Esc hủy)");
+    if resp.clicked() {
+        ui.ctx().data_mut(|d| {
+            d.insert_temp(eyedropper_request_id(), NodeEyedropperRequest { node_id, param });
+        });
+    }
+}
+
+pub(crate) fn color_picker_rgba_ex(ui: &mut Ui, node_id: NodeId, param: &'static str, color: &mut [f32; 4]) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let r = ui.color_edit_button_rgba_unmultiplied(color);
+        if r.hovered() {
+            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        }
+        draw_eyedropper_btn(ui, node_id, param);
+    });
+}
+
+pub(crate) fn color_picker_rgb_ex(ui: &mut Ui, node_id: NodeId, param: &'static str, color: &mut [f32; 3]) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        let r = ui.color_edit_button_rgb(color);
+        if r.hovered() {
+            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        }
+        draw_eyedropper_btn(ui, node_id, param);
+    });
 }
 
 /// Render toàn bộ thông số của các Atomic Nodes theo chiều dọc gọn gàng.
 pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
+    render_node_body_for(NodeId(0), node, ui);
+}
+
+/// Render toàn bộ thông số của Node kèm `NodeId` để gắn Eyedropper theo từng node/tham số.
+pub fn render_node_body_for(node_id: NodeId, node: &mut DarkNode, ui: &mut Ui) {
     let node_ptr = std::ptr::from_ref(node) as usize;
     ui.vertical(|ui| {
         ui.set_max_width(210.0);
@@ -116,7 +196,7 @@ pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
                 text_edit_multi(ui, text);
                 Grid::new(("txt_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
                     ui.label("Color:");
-                    color_picker_rgba(ui, color);
+                    color_picker_rgba_ex(ui, node_id, "text.color", color);
                     ui.end_row();
                     ui.label("Size:");
                     drag_val(ui, DragValue::new(font_size).range(8.0..=200.0));
@@ -161,7 +241,7 @@ pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
                     ui.label("Stroke:");
                     ui.horizontal(|ui| {
                         drag_val(ui, DragValue::new(stroke_width).range(0.0..=20.0).speed(0.2));
-                        color_picker_rgba(ui, stroke_color);
+                        color_picker_rgba_ex(ui, node_id, "text.stroke_color", stroke_color);
                     });
                     ui.end_row();
                 });
@@ -192,7 +272,7 @@ pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
                         });
                     ui.end_row();
                     ui.label("Color:");
-                    color_picker_rgba(ui, color);
+                    color_picker_rgba_ex(ui, node_id, "shape.color", color);
                     ui.end_row();
                     ui.label("Pos X/Y:");
                     ui.horizontal(|ui| {
@@ -217,7 +297,7 @@ pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
                     ui.label("Stroke:");
                     ui.horizontal(|ui| {
                         drag_val(ui, DragValue::new(stroke_width).range(0.0..=50.0).speed(0.2));
-                        color_picker_rgba(ui, stroke_color);
+                        color_picker_rgba_ex(ui, node_id, "shape.stroke_color", stroke_color);
                     });
                     ui.end_row();
                 });
@@ -431,7 +511,7 @@ pub fn render_node_body(node: &mut DarkNode, ui: &mut Ui) {
                     });
             }
             _ => {
-                crate::node_controls_fx::render_fx_controls(node, node_ptr, ui);
+                crate::node_controls_fx::render_fx_controls(node_id, node, node_ptr, ui);
             }
         }
     });

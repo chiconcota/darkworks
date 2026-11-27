@@ -417,13 +417,21 @@ pub enum GuideDialog {
     },
 }
 
-/// The colour parameter an armed eyedropper fills (`effects.setParam` arguments).
+/// Tham số màu đang chờ Eyedropper điền giá trị khi click vào Program Monitor.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Eyedropper {
-    pub clip: u64,
-    pub effect: usize,
-    pub param: String,
-    pub mask: Option<usize>,
+pub enum Eyedropper {
+    Effect {
+        clip: u64,
+        effect: usize,
+        param: String,
+        mask: Option<usize>,
+    },
+    NodeGraph {
+        clip: Option<u64>,
+        node_idx: usize,
+        param: String,
+        bypass_node: bool,
+    },
 }
 
 /// A keyframe selected in the Effect Controls keyframe lane: clip, effect index, parameter (of an

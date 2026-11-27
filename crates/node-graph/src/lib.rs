@@ -30,7 +30,7 @@ pub use group::VisualGroup;
 pub use history::{GraphHistory, GraphSnapshot};
 pub use node::{
     ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,
-    ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
+    KeyerMode, KeyerOutput, ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
 };
 pub use preset::{BuiltinPresetKind, NodeGraphPreset, PresetError};
 pub use types::{NodeDataType, pin_color32};

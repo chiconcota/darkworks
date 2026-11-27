@@ -2,5 +2,5 @@
 
 pub use darkworks_node_graph_core::{
     ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,
-    ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
+    KeyerMode, KeyerOutput, ShapeType, TextAlign, TimeMode, TransitionDirection, TransitionType,
 };

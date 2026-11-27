@@ -225,6 +225,7 @@ pub enum FxOp {
         smoothness: f32,
         spill_suppress: f32,
     },
+    Node(crate::nodes::NodeFxOp),
 }
 
 /// Effect ids [`FxOp::eval`] understands (the GPU-capable standard effects).
@@ -474,7 +475,12 @@ impl FxOp {
                 FxOp::crop_rect(w, h, 0.0, 0.0, 0.0, 0.0, amt)
             }
             "ultra_key" => {
-                if choice(e, "output") != 0 {
+                let output = choice(e, "output") as u8;
+                if output > 2
+                    || (f(e, "cc_saturation", cx) - 100.0).abs() > 1e-3
+                    || f(e, "cc_hue", cx).abs() > 1e-4
+                    || (f(e, "cc_luminance", cx) - 100.0).abs() > 1e-3
+                {
                     return None;
                 }
                 let kc = color(e, "key_color", cx);
@@ -483,19 +489,23 @@ impl FxOp {
                 let pf = |id: &str, fallback: f32| {
                     preset.and_then(|rows| rows.iter().find(|(k, _)| *k == id).map(|(_, v)| *v as f32)).unwrap_or(fallback)
                 };
-                if pf("soften", f(e, "soften", cx)) > 0.0
-                    || (f(e, "cc_saturation", cx) - 100.0).abs() > 1e-3
-                    || f(e, "cc_hue", cx).abs() > 1e-4
-                    || (f(e, "cc_luminance", cx) - 100.0).abs() > 1e-3
-                {
-                    return None;
-                }
-                FxOp::ChromaKey {
+                FxOp::Node(crate::nodes::NodeFxOp::ChromaKeyPro {
                     key_color: [kc[0], kc[1], kc[2]],
                     similarity: (pf("transparency", f(e, "transparency", cx)) / 100.0).clamp(0.0, 1.0),
                     smoothness: (pf("tolerance", f(e, "tolerance", cx)) / 100.0).clamp(0.0, 1.0),
                     spill_suppress: (pf("spill", f(e, "spill", cx)) / 100.0).clamp(0.0, 1.0),
-                }
+                    pedestal: (pf("pedestal", f(e, "pedestal", cx)) / 100.0 * 0.3).min(0.9),
+                    highlight: (pf("highlight", f(e, "highlight", cx)) / 100.0).clamp(0.0, 1.0),
+                    shadow: (pf("shadow", f(e, "shadow", cx)) / 100.0).clamp(0.0, 1.0),
+                    choke: (pf("choke", f(e, "choke", cx)) / 100.0).clamp(0.0, 1.0),
+                    soften: (pf("soften", f(e, "soften", cx)) / 100.0).clamp(0.0, 1.0),
+                    matte_contrast: (pf("contrast", f(e, "contrast", cx)) / 100.0).clamp(0.0, 1.0),
+                    invert_matte: false,
+                    desaturate: (pf("desaturate", f(e, "desaturate", cx)) / 100.0).clamp(0.0, 1.0),
+                    spill_luma: (pf("spill_luma", f(e, "spill_luma", cx)) / 100.0).clamp(0.0, 1.0),
+                    output,
+                    px_scale: cx.px_scale,
+                })
             }
             "transform" => {
                 // With its own shutter angle the CPU blurs the motion over seven samples
@@ -748,6 +758,7 @@ impl FxOp {
             FxOp::ChromaKey { key_color, similarity, smoothness, spill_suppress } => {
                 fin(key_color) && fin(&[*similarity, *smoothness, *spill_suppress])
             }
+            FxOp::Node(node_op) => node_op.gpu_ok(),
         }
     }
 
@@ -1160,6 +1171,7 @@ impl FxOp {
             FxOp::ChromaKey { key_color, similarity, smoothness, spill_suppress } => {
                 chroma_key_cpu(img, *key_color, *similarity, *smoothness, *spill_suppress);
             }
+            FxOp::Node(node_op) => node_op.apply(img),
         }
     }
 }

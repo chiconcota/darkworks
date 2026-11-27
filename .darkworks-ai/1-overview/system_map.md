@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, 18 Atomic Nodes (`ColorGrade`, `BlurSharpen` 6 kiểu, `DistortLens` 13 kiểu lọc UI, `Keyer` GPU `OP_CHROMA_KEY`, `Reroute` đa kiểu, `CustomWgsl`), `gpu_plan.rs` chạy GPU tuyến tính, Kho Preset `.preset.json`. | Hoàn thiện `Ultra Keyer` Pro ([ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md)) & **Node & Preset Library Browser** (`Task 3.13`). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, `Ultra Keyer` Pro + 14 `NodeFxOp` GPU Compute (`node_fx.wgsl`), Shared Eyedropper, `gpu_plan.rs` (Self-track, `Blend(V1/All Below)`, `AdjustmentLayer`), Kho Preset `.preset.json`. | Test toàn diện các Atomic Nodes còn lại & triển khai **Node & Preset Library Browser** (`Task 3.13`). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -123,6 +123,12 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-27 (`Ultra Keyer` Pro GPU, 14 `NodeFxOp` Compute Shaders, Shared Eyedropper & Tách Domain `gpu_plan.rs`):**
+  - Hoàn thành toàn bộ kế hoạch [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md): nâng cấp `DarkNode::Keyer` lên chuẩn Pro (`ChromaKey` / `LumaKey`, `Composite` / `AlphaChannel` / `ColorChannel`, `Pedestal`, `Highlight`, `Shadow`, `Choke`, `Soften`, `Matte Contrast`, `Invert Matte`, `Desaturate`, `Spill Luma`, `Garbage Matte` / `Matte Out`) tương thích ngược `#[serde(default)]`, tách `crates/node-graph-core/src/node_fx_types.rs` (279 dòng).
+  - Tách riêng pipeline Compute Shader `crates/gpu/src/node_fx.wgsl` (503 dòng) + `node_fx.rs` (190 dòng) và `crates/render/src/nodes/node_fx_ops.rs` (536 dòng) + `node_fx_distort_cpu.rs` (279 dòng): tăng tốc GPU cho `ChromaKeyPro` (3-pass ping-pong), `LumaKey`, `RadialZoom` và toàn bộ 9 chế độ `DistortLens` còn lại; mở khóa GPU cho cả FilmCraft `ultra_key` (`Relaxed`/`Aggressive`/`Soften`/`Choke`/`AlphaChannel`/`ColorChannel`).
+  - Tích hợp **Shared Eyedropper** trên Program Monitor cho cả 4 node chọn màu (`Keyer` auto-bypass khi hút màu, `ColorGrade`, `TextGenerator`, `ShapeGenerator`) cả ở chế độ clip lẫn scratchpad.
+  - Sửa lỗi fallback CPU khi clip ở `V2` dùng `VideoInput("V2")` + `Blend(Bg = "V1" | "All Below")` (kể cả khi `V1` trống) và đưa `Add as FX Clip` (`AdjustmentLayer` -> `PlanStep::Adjust`) lên GPU. Tách phần biên dịch `FxOp` ra khỏi `gpu_plan.rs` (còn 369 dòng) về `color.rs`, `blur_distort.rs`, `transform_blend.rs` theo đúng ranh giới miền.
 
 - **2026-11-26 (GPU `OP_CHROMA_KEY`, Biên Dịch `gpu_plan.rs`, Nâng Cấp `BlurSharpen`/`DistortLens` & Lập Kế Hoạch `Ultra Keyer` Pro):**
   - Sửa lỗi `AudioReactor` + `ColorGrade` (`Exp` linear stops + `Exp Mod * 2.5`), Preset 4 (`AudioBeatFlash`), thêm `DataType` trên `Reroute`, snippet `fn fs_main` trên `CustomWgsl`, và kiểm tra tương thích kiểu khi nối dây (`viewer::connect`).

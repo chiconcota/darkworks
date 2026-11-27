@@ -701,14 +701,29 @@ fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, 
     {
         let uv = (((pos.x - pic.min.x) / pic.width()).clamp(0.0, 1.0), ((pos.y - pic.min.y) / pic.height()).clamp(0.0, 1.0));
         let mut project = (*app.session.project).clone();
-        if let Some(e) =
-            project.sequence_mut(seq).and_then(|q| q.find_item_mut(filmcraft_project::ClipId(armed.clip))).and_then(|(_, it)| it.effects.get_mut(armed.effect))
-        {
-            e.enabled = false;
-        }
+        let salt = match &armed {
+            crate::state::Eyedropper::Effect { clip, effect, .. } => {
+                if let Some(e) = project
+                    .sequence_mut(seq)
+                    .and_then(|q| q.find_item_mut(filmcraft_project::ClipId(*clip)))
+                    .and_then(|(_, it)| it.effects.get_mut(*effect))
+                {
+                    e.enabled = false;
+                }
+                clip.rotate_left(17) ^ (*effect as u64)
+            }
+            crate::state::Eyedropper::NodeGraph { clip, node_idx, bypass_node, .. } => {
+                if *bypass_node
+                    && let Some(cid) = clip
+                {
+                    crate::panels::node_graph_bridge::bypass_node_in_project(&ctx, seq, *cid, *node_idx, &mut project);
+                }
+                clip.unwrap_or(0).rotate_left(19) ^ (*node_idx as u64)
+            }
+        };
         let frame = rate.frame_at(time);
         // a revision of its own, so this render never replaces what the monitor caches
-        let revision = app.session.revision ^ 0x5eed_d70b_0000_0000 ^ armed.clip.rotate_left(17) ^ armed.effect as u64;
+        let revision = app.session.revision ^ 0x5eed_d70b_0000_0000 ^ salt;
         let key = FrameKey { target, frame, size: (EYEDROPPER_SCALE * 1000.0) as u32, revision, draft: false };
         ctx.data_mut(|d| d.insert_temp(pending_id, EyedropperPick { uv, key, time: rate.tick_of(frame), project: std::sync::Arc::new(project) }));
     }
@@ -724,12 +739,19 @@ fn eyedropper(app: &mut FilmcraftApp, ui: &mut egui::Ui, resp: &egui::Response, 
         app.ui.status = tl!("Eyedropper: no picture to sample").to_string();
         return;
     };
-    let mut params = json!({"clip": armed.clip, "effect": armed.effect, "param": armed.param, "value": eyedropper_value(rgb)});
-    if let Some(k) = armed.mask {
-        params["mask"] = json!(k);
-    }
-    if let Err(e) = app.session.execute("effects.setParam", params) {
-        app.ui.status = e.to_string();
+    match armed {
+        crate::state::Eyedropper::Effect { clip, effect, param, mask } => {
+            let mut params = json!({"clip": clip, "effect": effect, "param": param, "value": eyedropper_value(rgb)});
+            if let Some(k) = mask {
+                params["mask"] = json!(k);
+            }
+            if let Err(e) = app.session.execute("effects.setParam", params) {
+                app.ui.status = e.to_string();
+            }
+        }
+        crate::state::Eyedropper::NodeGraph { clip, node_idx, param, .. } => {
+            crate::panels::node_graph_bridge::apply_eyedropper_color(&ctx, app, clip, node_idx, &param, rgb);
+        }
     }
 }
 

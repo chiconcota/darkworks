@@ -260,6 +260,15 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, ParamValue)>, bool)> {
             ],
             true,
         ),
+        (
+            "ultra_key",
+            vec![
+                ("setting", ch(2)),
+                ("soften", fl(25.0)),
+                ("choke", fl(20.0)),
+            ],
+            true,
+        ),
         ("alpha_adjust", vec![("opacity", fl(60.0))], false),
         ("alpha_adjust", vec![("ignore", ParamValue::Bool(true)), ("invert", ParamValue::Bool(true))], false),
         ("alpha_adjust", vec![("invert", ParamValue::Bool(true)), ("mask_only", ParamValue::Bool(true)), ("opacity", fl(150.0))], false),
@@ -938,5 +947,172 @@ fn effect_source_integer_decimation_preserves_cpu_box_oracle() {
             let (worst, flips) = compare(&cpu, &gpu);
             assert!(worst <= EXACT && flips == 0.0, "{w}x{h} n{n} source box: {worst}, {flips}");
         }
+    }
+}
+
+#[test]
+fn node_fx_pro_keyer_and_distort_match_cpu_exactly() {
+    use filmcraft_render::nodes::NodeFxOp;
+    let Some((dev, q)) = device() else {
+        eprintln!("no GPU adapter; skipping");
+        return;
+    };
+    let mut c = GpuCompositor::new(&dev, &q);
+    let (w, h) = (64u32, 48u32);
+    let px = picture(w, h);
+    let frame = VideoFrame::rgba_f32(w, h, px.clone());
+
+    let cases: Vec<(&str, NodeFxOp, bool)> = vec![
+        (
+            "chroma_key_pro_fast",
+            NodeFxOp::ChromaKeyPro {
+                key_color: [0.0, 1.0, 0.0],
+                similarity: 0.45,
+                smoothness: 0.20,
+                spill_suppress: 0.85,
+                pedestal: 0.10,
+                highlight: 0.15,
+                shadow: 0.45,
+                choke: 0.0,
+                soften: 0.0,
+                matte_contrast: 0.25,
+                invert_matte: false,
+                desaturate: 0.30,
+                spill_luma: 0.50,
+                output: 0,
+                px_scale: 1.0,
+            },
+            false,
+        ),
+        (
+            "chroma_key_pro_choke_soften_alpha",
+            NodeFxOp::ChromaKeyPro {
+                key_color: [0.1, 0.9, 0.15],
+                similarity: 0.50,
+                smoothness: 0.25,
+                spill_suppress: 0.90,
+                pedestal: 0.12,
+                highlight: 0.20,
+                shadow: 0.50,
+                choke: 0.35,
+                soften: 0.25,
+                matte_contrast: 0.40,
+                invert_matte: true,
+                desaturate: 0.45,
+                spill_luma: 0.65,
+                output: 1,
+                px_scale: 1.0,
+            },
+            false,
+        ),
+        (
+            "chroma_key_pro_color_channel",
+            NodeFxOp::ChromaKeyPro {
+                key_color: [0.0, 0.95, 0.1],
+                similarity: 0.40,
+                smoothness: 0.15,
+                spill_suppress: 0.95,
+                pedestal: 0.10,
+                highlight: 0.10,
+                shadow: 0.50,
+                choke: 0.0,
+                soften: 0.0,
+                matte_contrast: 0.0,
+                invert_matte: false,
+                desaturate: 0.35,
+                spill_luma: 0.55,
+                output: 2,
+                px_scale: 1.0,
+            },
+            false,
+        ),
+        (
+            "luma_key_fast",
+            NodeFxOp::LumaKey {
+                threshold: 0.20,
+                cutoff: 0.25,
+                choke: 0.0,
+                soften: 0.0,
+                matte_contrast: 0.2,
+                invert_matte: false,
+                output: 0,
+                px_scale: 1.0,
+            },
+            false,
+        ),
+        (
+            "luma_key_cleanup",
+            NodeFxOp::LumaKey {
+                threshold: 0.15,
+                cutoff: 0.30,
+                choke: 0.25,
+                soften: 0.20,
+                matte_contrast: 0.35,
+                invert_matte: true,
+                output: 1,
+                px_scale: 1.0,
+            },
+            false,
+        ),
+        (
+            "radial_zoom",
+            NodeFxOp::RadialZoom { strength: 0.35, cx: 32.0, cy: 24.0, taps: 16 },
+            false,
+        ),
+        (
+            "pixelate",
+            NodeFxOp::Pixelate { block_w: 8, block_h: 8 },
+            true,
+        ),
+        (
+            "chromatic_aberration",
+            NodeFxOp::ChromaticAberration { shift: 2.5 },
+            false,
+        ),
+        (
+            "ripple_wave",
+            NodeFxOp::RippleWave { amp: 4.0, freq: 0.2, phase: 1.1 },
+            false,
+        ),
+        (
+            "lens_distort",
+            NodeFxOp::LensDistort { k: 0.35, cx: 32.0, cy: 24.0, norm: 40.0 },
+            false,
+        ),
+        (
+            "twirl",
+            NodeFxOp::Twirl { ang: 1.4, rad: 22.0, cx: 32.0, cy: 24.0 },
+            false,
+        ),
+        (
+            "find_edges",
+            NodeFxOp::FindEdges { invert: false, blend: 0.2 },
+            false,
+        ),
+        (
+            "noise_grain",
+            NodeFxOp::NoiseGrain { amt: 0.25, grain: 2.0, color_mix: 0.6, seed: 42 },
+            false,
+        ),
+        (
+            "turbulent_displace",
+            NodeFxOp::TurbulentDisplace { amt: 8.0, size: 16.0, ox: 0.5, oy: 0.2, evo: 0.8 },
+            false,
+        ),
+    ];
+
+    for (name, node_op, step_fn) in cases {
+        let op = FxOp::Node(node_op);
+        let mut cpu = filmcraft_render::Image { w: w as usize, h: h as usize, px: px.clone() };
+        op.apply(&mut cpu);
+        let (_, _, gpu) = c
+            .effect_image(&frame, &LayerFx { size: (w, h), decimation: 1, turns: 0, ops: vec![op] })
+            .unwrap_or_else(|| panic!("{name}: gpu effect_image failed"));
+        let (worst, flips) = compare(&cpu.px, &gpu);
+        let max_flips = if step_fn { FLIPS } else { 0.0 };
+        assert!(
+            worst <= 5e-4 && flips <= max_flips,
+            "{name} parity mismatch: worst={worst}, flips={flips}"
+        );
     }
 }

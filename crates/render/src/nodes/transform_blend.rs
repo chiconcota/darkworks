@@ -1,13 +1,16 @@
 //! Xử lý biến hình, hòa trộn & chuyển cảnh cho `Transform2D`, `Blend` và `Transition` Nodes.
 
-use darkworks_node_graph_core::{BlendMode, TransitionDirection, TransitionType};
+use darkworks_node_graph_core::{
+    BlendMode, DarkNode, EvaluationContext, NodeGraphDoc, TransitionDirection, TransitionType,
+};
 use filmcraft_geom::{Affine, Vec2};
 use rayon::prelude::*;
 
 use crate::blend::{Blend, composite};
 use crate::effects::gaussian_boxes;
-use crate::gpufx::FxOp;
+use crate::gpufx::{FxOp, Resample};
 use crate::image::Image;
+use crate::nodes::signals::{modulated_scalar_add, modulated_scalar_mul, modulated_vec2_add};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_transform(
@@ -210,4 +213,78 @@ pub(crate) fn map_blend(mode: BlendMode) -> Blend {
         BlendMode::Color => Blend::Color,
         BlendMode::Luminosity => Blend::Luminosity,
     }
+}
+
+/// Biên dịch `DarkNode::CropMask` thành [`FxOp::Crop`] chạy GPU.
+pub(crate) fn push_crop_gpu_op(
+    node: &DarkNode,
+    size: [usize; 2],
+    px_scale: f32,
+    ops: &mut Vec<FxOp>,
+) {
+    let DarkNode::CropMask { top, bottom, left, right, feather } = node else {
+        return;
+    };
+    let [lw, lh] = [size[0] as f32, size[1] as f32];
+    let x0 = (left.clamp(0.0, 1.0) * lw).min(lw);
+    let y0 = (top.clamp(0.0, 1.0) * lh).min(lh);
+    ops.push(FxOp::Crop {
+        x0,
+        x1: ((1.0 - right.clamp(0.0, 1.0)) * lw).max(x0),
+        y0,
+        y1: ((1.0 - bottom.clamp(0.0, 1.0)) * lh).max(y0),
+        feather: (*feather * px_scale).max(0.0),
+    });
+}
+
+/// Biên dịch `DarkNode::Transform2D` thành chuỗi [`FxOp`] chạy GPU.
+pub(crate) fn push_transform_gpu_ops(
+    doc: &NodeGraphDoc,
+    sig_ctx: &EvaluationContext,
+    id: usize,
+    node: &DarkNode,
+    size: [usize; 2],
+    seq_scale: [f32; 2],
+    ops: &mut Vec<FxOp>,
+) -> Option<()> {
+    let DarkNode::Transform2D {
+        position,
+        scale,
+        rotation_deg,
+        anchor,
+        opacity,
+        flip_h,
+        flip_v,
+    } = node
+    else {
+        return Some(());
+    };
+    if *flip_h {
+        ops.push(FxOp::HFlip);
+    }
+    if *flip_v {
+        ops.push(FxOp::VFlip);
+    }
+    let pos = modulated_vec2_add(doc, sig_ctx, id, 1, *position);
+    let s_mod = modulated_scalar_mul(doc, sig_ctx, id, 2, 1.0);
+    let rot_mod = modulated_scalar_add(doc, sig_ctx, id, 3, *rotation_deg);
+    let op_mod = modulated_scalar_mul(doc, sig_ctx, id, 4, *opacity).clamp(0.0, 1.0);
+    let sc = [scale[0] * s_mod, scale[1] * s_mod];
+    if sc[0].abs() < 0.5 || sc[1].abs() < 0.5 {
+        return None;
+    }
+    let [lw, lh] = size;
+    let [sx, sy] = seq_scale;
+    let px_pos = Vec2::new(
+        lw as f64 * 0.5 + pos[0] as f64 * sx as f64,
+        lh as f64 * 0.5 + pos[1] as f64 * sy as f64,
+    );
+    let px_anchor = Vec2::new(lw as f64 * anchor[0] as f64, lh as f64 * anchor[1] as f64);
+    let m = Affine::motion(px_pos, Vec2::new(sc[0] as f64, sc[1] as f64), rot_mod as f64, px_anchor);
+    ops.push(FxOp::Resample(Resample {
+        inv: m.inverse(),
+        rect: [0, lw as u32, 0, lh as u32],
+        opacity: op_mod,
+    }));
+    Some(())
 }

@@ -1,6 +1,6 @@
 # MODULE KIẾN TRÚC: NODE GRAPH & GPU COMPOSITOR (node-graph/architecture.md)
-@crate: `crates/node-graph-core` (L0) + `crates/node-graph` (L5) + `crates/render/src/node_graph.rs` (L2) + `crates/gpu/src/custom_wgsl.rs` (L3)
-@engine: egui_snarl + wgpu + crates/text | @status: 🟡 Hoàn Thành Core DAG + Preset `.preset.json` + GPU `OP_CHROMA_KEY` & Linear `gpu_plan.rs` (Phiên sau nâng cấp `Ultra Keyer` Pro + Node/Preset Library UI)
+@crate: `crates/node-graph-core` (L0) + `crates/node-graph` (L5) + `crates/render/src/node_graph.rs` & `nodes/` (L2) + `crates/gpu/src/{node_fx.rs, node_fx.wgsl, custom_wgsl.rs}` (L3)
+@engine: egui_snarl + wgpu + crates/text | @status: 🟢 Hoàn Thành `Ultra Keyer` Pro + 14 `NodeFxOp` GPU Compute Shaders + Shared Eyedropper + Linear/`Blend`/`FX Clip` GPU Planner (Phiên sau test toàn diện các Atomic Nodes khác)
 
 ## 1. VAI TRÒ & TRÁCH NHIỆM
 Đây là trái tim đồ họa phân biệt Darkworks với FilmCraft và Premiere truyền thống. Module này thay thế hoàn toàn danh sách tuyến tính `Vec<EffectInstance>` bằng mạng lưới đồ thị có hướng không chu trình (Directed Acyclic Graph - DAG), hỗ trợ các container đóng gói (Black Node), trạm tự động hóa quy trình (Action Node), công cụ tổ chức canvas ComfyUI Style, và khả năng mở rộng vô hạn qua Code Node (Custom WGSL JIT Shader).
@@ -20,9 +20,9 @@
   3. `ShapeGenerator`: Vẽ hình khối chữ nhật bo góc, hình tròn, Solid Matte kèm `position`, `stroke_width` + `stroke_color`, `feather` (làm mềm viền Mask), và socket `Pos Mod (Vec2)`.
   4. `TimeDriver`: Bộ đếm thời gian (`Linear`, `SineLoop`, `PingPong`), hỗ trợ `amplitude`, `offset`, `vec2_axis`, xuất cả `Time Value (Scalar)` lẫn `Vec2 Out (Vec2)`.
   5. `ColorGrade`: Chỉnh sáng/màu cơ bản (`exposure` + socket `Exp Mod`, `contrast`, `saturation`, `temperature`, `tint`, `gamma`, `tint_color`/`tint_amount`), `Invert Colors`, `Black & White`, và bộ Lumetri mở rộng (`highlights`, `shadows`, `whites`, `blacks`, `vibrance`, `faded_film`, `shadow_tint`, `highlight_tint`).
-  6. `BlurSharpen`: Gom 6 thuật toán (`Gaussian`, `Box`, `Directional`, `BokehBloom`, `UnsharpMask`, `RadialZoom`) kèm `radius` + socket `Radius Mod (Scalar)`, `dimensions` (`Both`/`Horizontal`/`Vertical`), `repeat_edge`, `bokeh_sides` (Polygon shape 0..8), `center [X, Y]`, `angle_deg`, `highlight_boost`, `threshold`.
-  7. `DistortLens`: Gom 13 hiệu ứng (`Vignette`, `FishEye`, `LensDistortion`, `RippleWave`, `ChromaticAberration`, `Mirror`, `Offset`, `Posterize`, `Pixelate`, `Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace`); UI trong `node_controls_fx.rs` tự động ẩn các ô không liên quan theo từng chế độ.
-  8. `Keyer`: Tách phông xanh Ultra Keyer bằng Y'CbCr (Bt.709) + 1px neighbor choke (kẹp biên) + spill suppression (`G <= max(R, B)`), biên dịch sang GPU `OP_CHROMA_KEY = 37` khi nối tuyến tính (`Apply to Clip`).
+  6. `BlurSharpen`: Gom 6 thuật toán (`Gaussian`, `Box`, `Directional`, `BokehBloom`, `UnsharpMask`, `RadialZoom` — nay chạy GPU via `NodeFxOp::RadialZoom`) kèm `radius` + socket `Radius Mod (Scalar)`, `dimensions` (`Both`/`Horizontal`/`Vertical`), `repeat_edge`, `bokeh_sides` (Polygon shape 0..8), `center [X, Y]`, `angle_deg`, `highlight_boost`, `threshold`.
+  7. `DistortLens`: Gom 13 hiệu ứng — cả 9 chế độ trước đây chạy CPU (`Pixelate`, `ChromaticAberration`, `RippleWave`, `FishEye`, `LensDistortion`, `Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace`) nay chạy 100% GPU via `node_fx.wgsl`, cùng 4 chế độ gốc (`Vignette`, `Mirror`, `Offset`, `Posterize`); UI trong `node_controls_fx.rs` tự động ẩn các ô không liên quan theo từng chế độ.
+  8. `Keyer` (`Ultra Keyer` Pro): Hỗ trợ 2 chế độ (`ChromaKey` Y'CbCr Bt.709 3-pass `Matte -> Choke -> Finish` / `LumaKey` Luminance threshold/cutoff), 3 chế độ output (`Composite`, `AlphaChannel`, `ColorChannel`), đầy đủ bộ lọc (`Pedestal`, `Highlight`, `Shadow`, `Choke`, `Soften`, `Matte Contrast`, `Invert Matte`, `Desaturate`, `Spill Luma`), pin `Garbage Matte` (in pin 1) + `Matte Out` (out pin 1), và **Shared Eyedropper** hút màu trực tiếp trên Program Monitor (kèm auto-bypass tức thì).
   9. `Transform2D`: Zoom (`Scale X/Y`), Pan, Rotate, Anchor, Opacity, và 2 toggle `[Flip H]`, `[Flip V]`.
   10. `CropMask`: Cắt xén 4 cạnh và làm mềm viền `feather`.
   11. `Blend`: Trộn 2 lớp hình ảnh với đầy đủ 27 chế độ hòa trộn của `filmcraft_render::Blend` (`BlendMode::ALL`, giữ `Add` tương thích ngược) và 3 cổng `Background`, `Foreground`, `Mask`.
@@ -71,12 +71,21 @@
 
 ## 3. CẤU TRÚC PHÂN TẦNG SOURCE CODE
 ```text
-crates/node-graph-core/    # Layer 0 (không egui): NodeGraphDoc, DarkNode, DagEvaluator, WgslParser
-crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs, node_controls_fx.rs, viewer.rs, preset.rs, history.rs, group.rs
+crates/node-graph-core/    # Layer 0 (không egui): node.rs (532d), node_fx_types.rs (279d), preset.rs, graph.rs, wgsl_parser.rs
+crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs, node_controls_fx.rs (405d), viewer.rs, preset.rs, history.rs, group.rs
 crates/render/src/
-├── node_graph.rs          # DAG execution dispatcher (416 dòng, đường đa nhánh / CPU / FX Clip)
-├── node_graph_tests.rs    # Unit tests cho eval_item_graph (296 dòng)
-└── nodes/                 # gpu_plan.rs (biên dịch nhánh tuyến tính lên GPU LayerFx), color.rs, blur_distort.rs, shape.rs, text.rs, transform_blend.rs, signals.rs
-crates/gpu/src/            # fx.rs + fx.wgsl (OP_CHROMA_KEY = 37) & custom_wgsl.rs
+├── node_graph.rs          # DAG execution dispatcher (đường đa nhánh / Garbage Matte / Matte Out)
+├── node_graph_tests.rs    # Unit tests cho eval_item_graph
+└── nodes/
+    ├── gpu_plan.rs        # Graph planner/scheduler (369d): Apply to Clip (Auto/Clip/track của clip), Blend(V1/All Below), AdjustmentLayer
+    ├── gpu_plan_tests.rs  # Unit tests cho GPU planner (392d)
+    ├── node_fx_ops.rs     # 14 NodeFxOp + CPU fallback thống nhất (536d)
+    ├── node_fx_distort_cpu.rs # CPU parity helpers cho hiệu ứng biến dạng (279d)
+    ├── color.rs           # ColorGrade & Keyer (CPU + push_*_gpu_op, 383d)
+    ├── blur_distort.rs    # BlurSharpen & DistortLens (CPU + push_*_gpu_ops, 450d)
+    ├── transform_blend.rs # Transform2D, CropMask, Blend, Transition (CPU + push_*_gpu_ops, 290d)
+    └── shape.rs / text.rs / signals.rs
+crates/gpu/src/            # node_fx.rs (190d) + node_fx.wgsl (503d), fx.rs + fx.wgsl, custom_wgsl.rs
 crates/engine/src/node_graph.rs # Lệnh Session::execute (nodeGraph.*)
+crates/ui-egui/src/panels/ # node_graph*, monitor.rs (Shared Eyedropper)
 ```

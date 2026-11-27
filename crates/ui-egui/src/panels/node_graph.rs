@@ -453,10 +453,12 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut Ui, rect: Rect) {
         state.renaming_buf.clone(),
     );
 
+    node_graph_bridge::publish_eyedropper_active(app, ui.ctx());
     egui_snarl::ui::SnarlWidget::new()
         .id(snarl_id)
         .style(style)
         .show(&mut state.snarl, &mut viewer, &mut canvas_ui);
+    node_graph_bridge::consume_eyedropper_request(app, ui.ctx(), state);
 
     state.current_to_global = viewer.to_global;
     state.current_zoom = viewer.current_scale;

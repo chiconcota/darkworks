@@ -862,7 +862,7 @@ fn param_value_widget(
                 set = Some(json!([srgb.r() as f32 / 255.0, srgb.g() as f32 / 255.0, srgb.b() as f32 / 255.0, c[3]]));
             }
             // Eyedropper: arm it, then click a pixel in the Program monitor (Esc cancels)
-            let target = crate::state::Eyedropper { clip: clip.0, effect: idx, param: pd.id.to_string(), mask };
+            let target = crate::state::Eyedropper::Effect { clip: clip.0, effect: idx, param: pd.id.to_string(), mask };
             let armed = app.ui.eyedropper.as_ref() == Some(&target);
             let drop = icons::button(vui, Icon::Eyedropper, 18.0, armed, &t, tl!("Eyedropper (pick a color from the Program monitor)"));
             app.auto.add(&format!("effectControls.{}.{}.eyedropper", e.effect, pkey), drop.rect, "Eyedropper");

@@ -80,3 +80,11 @@
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `cargo xtask layers`
   - `python3 .agents/harness/audit.py` (`0` vi phạm `>= 700` dòng, đặc biệt để ý `crates/node-graph-core/src/node.rs`).
+
+---
+
+## 4. HẠNG MỤC KIẾN TRÚC LỚN ĐỂ DÀNH SANG PHASE 4 (ĐÃ GHI VÀO `master-plan-a-z.md`)
+Các hạng mục chưa làm trong đợt này vì đòi hỏi thay đổi kiến trúc DAG GPU đa luồng đã được ghi nhận vào **Giai đoạn 4 (`Task 4.1` & `Task 4.8`)** trong [master-plan-a-z.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/master-plan-a-z.md) để các phiên sau xử lý:
+1. **DAG Multi-Texture Pool trên GPU (`Task 4.8`):** Chạy đồ thị rẽ nhánh nhiều luồng song song trên VRAM (vd: `Cinematic Soft Glow`, `Spotlight Invert`, `Keyer` nối `Garbage Matte` động từ `ShapeGenerator`) thay vì rơi về `eval_item_graph` CPU.
+2. **`CustomWgsl` Zero-Readback (`Task 4.8`):** Giữ texture trung gian của `CustomWgsl` trên GPU VRAM khi nối tiếp sang các Node GPU khác, bỏ readback về CPU `Image`.
+3. **Vello Compute Shader cho `TextGenerator` & `ShapeGenerator` (`Task 4.1`):** Chuyển từ CPU rasterizer (`filmcraft_text`) sang Vello Compute Shader GPU.

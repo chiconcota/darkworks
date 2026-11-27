@@ -328,7 +328,15 @@ fn is_adjustment(project: &Project, it: &TrackItem) -> bool {
 /// evaluating to an op the GPU runs (at the frame's size, as `adjustment_layer` applies them on the
 /// CPU). None sends the frame to the CPU. [`layered_at`] and [`push_adjustment`] both ask this, so
 /// [`is_cpu_frame`] knows which frames plan as one CPU image.
-fn adjustment_ops(project: &Project, seq: &Sequence, it: &TrackItem, t: Tick, scale: f32, caps: DeviceCaps) -> Option<Vec<FxOp>> {
+fn adjustment_ops(
+    project: &Project,
+    seq: &Sequence,
+    it: &TrackItem,
+    t: Tick,
+    scale: f32,
+    caps: DeviceCaps,
+    sources: Option<&dyn SourceProvider>,
+) -> Option<Vec<FxOp>> {
     let mt = it.effect_time_at(t);
     let (op, bl) = crate::opacity_blend(it, mt);
     let (w, h) = output_size(seq, scale);
@@ -339,6 +347,14 @@ fn adjustment_ops(project: &Project, seq: &Sequence, it: &TrackItem, t: Tick, sc
         || !crate::adjustment_covers_output(seq, it, project, mt, scale, w, h)
     {
         return None;
+    }
+    if let Some(doc) = it.node_graph.as_deref() {
+        let opts = RenderOptions { scale, effects: true, ..RenderOptions::default() };
+        return if let Some(src) = sources {
+            crate::nodes::eval_adjustment_graph_to_fx_ops(project, seq, it, doc, t, opts, w, h, scale, Some(src))
+        } else {
+            crate::nodes::can_plan_adjustment_graph(doc).then(Vec::new)
+        };
     }
     let cx = crate::effects::FxCtx {
         t: mt,
@@ -362,13 +378,37 @@ fn adjustment_ops(project: &Project, seq: &Sequence, it: &TrackItem, t: Tick, sc
         .collect()
 }
 
+fn single_below_track_name(project: &Project, seq: &Sequence, tr_idx: usize, t: Tick) -> Option<String> {
+    let mut active_idx: Option<usize> = None;
+    for (idx, tr) in seq.video_tracks[..tr_idx].iter().enumerate() {
+        if !tr.enabled {
+            continue;
+        }
+        if tr.transitions.iter().any(|x| x.range().contains(t)) {
+            return None;
+        }
+        if let Some(it) = tr.item_at(t)
+            && it.enabled
+        {
+            if is_adjustment(project, it) || active_idx.is_some() {
+                return None;
+            }
+            active_idx = Some(idx);
+        }
+    }
+    if active_idx.is_none() && tr_idx == 1 {
+        return Some("V1".to_string());
+    }
+    active_idx.map(|idx| format!("V{}", idx + 1))
+}
+
 /// Whether the frame of `seq` at `t` and render `scale` can be planned as layers for a device that
 /// runs `caps`: no adjustment layer it can't run ([`adjustment_ops`]) and no transition the
 /// compositor cannot mix itself is showing (a transition into or out of an adjustment layer counts,
 /// also on the side of the cut where the other clip is).
 pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick, scale: f32, caps: DeviceCaps) -> bool {
     let adjustment = |it: &TrackItem| is_adjustment(project, it);
-    for tr in &seq.video_tracks {
+    for (tr_idx, tr) in seq.video_tracks.iter().enumerate() {
         if !tr.enabled {
             continue;
         }
@@ -383,11 +423,17 @@ pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick, scale: f32,
         if let Some(it) = tr.item_at(t)
             && it.enabled
         {
-            if it.node_graph.as_deref().is_some_and(|d| adjustment(it) || crate::nodes::graph_needs_below(d)) {
-                return false;
-            }
-            if adjustment(it) && adjustment_ops(project, seq, it, t, scale, caps).is_none() {
-                return false;
+            if adjustment(it) {
+                if adjustment_ops(project, seq, it, t, scale, caps, None).is_none() {
+                    return false;
+                }
+            } else if let Some(doc) = it.node_graph.as_deref()
+                && crate::nodes::graph_needs_below_for(doc, Some((tr_idx, tr.name.as_str())))
+            {
+                let below_name = single_below_track_name(project, seq, tr_idx, t);
+                if !crate::nodes::can_plan_clip_graph(doc, Some((tr_idx, tr.name.as_str())), below_name.as_deref()) {
+                    return false;
+                }
             }
         }
     }
@@ -398,7 +444,7 @@ pub(crate) fn layered_at(project: &Project, seq: &Sequence, t: Tick, scale: f32,
 /// [`adjustment_ops`] declines sends the frame to the CPU ([`layered_at`] has declined the frame
 /// already then).
 fn push_adjustment(sc: Scene, item: &TrackItem, out: &mut PlanStack) {
-    match adjustment_ops(sc.project, sc.seq, item, sc.t, sc.opts.scale, sc.caps) {
+    match adjustment_ops(sc.project, sc.seq, item, sc.t, sc.opts.scale, sc.caps, Some(sc.sources)) {
         Some(ops) => out.push_adjust(ops),
         None => out.cpu_only = true,
     }
@@ -409,7 +455,7 @@ fn push_adjustment(sc: Scene, item: &TrackItem, out: &mut PlanStack) {
 fn push_tracks(sc: Scene, layers: &mut PlanStack) {
     let Scene { project, seq, t, opts, .. } = sc;
     let (w, h) = output_size(seq, opts.scale);
-    for tr in &seq.video_tracks {
+    for (tr_idx, tr) in seq.video_tracks.iter().enumerate() {
         if layers.exhausted {
             return;
         }
@@ -427,7 +473,7 @@ fn push_tracks(sc: Scene, layers: &mut PlanStack) {
                     for (slot, item) in inputs.iter_mut().zip([a, b]) {
                         if let Some(item) = item {
                             let mut input = PlanStack::default();
-                            push_item(sc, item, 1.0, Some(Blend::Normal), &mut input);
+                            push_item(sc, item, 1.0, Some(Blend::Normal), Some((tr_idx, tr.name.as_str())), None, &mut input);
                             let Some(input_layers) = input.into_layers(w, h) else {
                                 layers.exhausted = true;
                                 return;
@@ -448,16 +494,16 @@ fn push_tracks(sc: Scene, layers: &mut PlanStack) {
                     layers.push(PlanLayer::new(Arc::new(VideoFrame::rgba_f32(1, 1, col.to_vec())), Affine::scale(w as f64, h as f64), 1.0, Blend::Normal));
                     let (it, k) = if p < 0.5 { (a, 1.0 - p * 2.0) } else { (b, (p - 0.5) * 2.0) };
                     if let Some(it) = it {
-                        push_item(sc, it, k, Some(Blend::Normal), layers);
+                        push_item(sc, it, k, Some(Blend::Normal), Some((tr_idx, tr.name.as_str())), None, layers);
                     }
                 }
                 _ => {
                     // cross dissolve: A at full, B over it at p (premultiplied over == linear mix when A is opaque)
                     if let Some(it) = a {
-                        push_item(sc, it, 1.0 - if b.is_none() { p } else { 0.0 }, Some(Blend::Normal), layers);
+                        push_item(sc, it, 1.0 - if b.is_none() { p } else { 0.0 }, Some(Blend::Normal), Some((tr_idx, tr.name.as_str())), None, layers);
                     }
                     if let Some(it) = b {
-                        push_item(sc, it, p, Some(Blend::Normal), layers);
+                        push_item(sc, it, p, Some(Blend::Normal), Some((tr_idx, tr.name.as_str())), None, layers);
                     }
                 }
             }
@@ -473,7 +519,8 @@ fn push_tracks(sc: Scene, layers: &mut PlanStack) {
             }
             continue;
         }
-        push_item(sc, item, 1.0, None, layers);
+        let below_name = single_below_track_name(project, seq, tr_idx, t);
+        push_item(sc, item, 1.0, None, Some((tr_idx, tr.name.as_str())), below_name.as_deref(), layers);
     }
 }
 
@@ -512,7 +559,16 @@ struct Scene<'a> {
 /// the CPU reference mixes the clips and composites the result Normal, ignoring their modes.
 /// `nest` counts the multi-camera clips already followed to reach `item` (see
 /// [`crate::MAX_NEST_DEPTH`]).
-fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blend>, out: &mut PlanStack) {
+#[allow(clippy::too_many_arguments)]
+fn push_item(
+    sc: Scene,
+    item: &TrackItem,
+    extra_opacity: f32,
+    blend: Option<Blend>,
+    self_track: Option<(usize, &str)>,
+    single_below_track: Option<&str>,
+    out: &mut PlanStack,
+) {
     let Scene { project, seq, t, opts, caps, sources, nest } = sc;
     if out.exhausted {
         return;
@@ -537,7 +593,7 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
         // Inside the nested sequence the angle's clip is composited onto an empty canvas, where
         // every mode but Dissolve is Normal; the multicam clip's own mode then applies to it.
         if let Some(inner) = tr.item_at(ft).filter(|i| i.enabled) {
-            push_item(Scene { seq: nested, t: ft, nest: nest + 1, ..sc }, inner, extra_opacity * op, Some(bl), out);
+            push_item(Scene { seq: nested, t: ft, nest: nest + 1, ..sc }, inner, extra_opacity * op, Some(bl), None, None, out);
         }
         return;
     }
@@ -623,19 +679,40 @@ fn push_item(sc: Scene, item: &TrackItem, extra_opacity: f32, blend: Option<Blen
                 frame_rate: seq.settings.frame_rate.as_f64(),
                 working: seq.settings.color.working,
             };
-            let ops: Option<Vec<FxOp>> = if has_graph
+            let gplan: Option<crate::nodes::GpuGraphPlan> = if has_graph
                 && let Some(doc) = item.node_graph.as_deref()
             {
-                crate::nodes::eval_graph_to_fx_ops(project, seq, item, doc, t, opts, lw, lh, px_scale, sources)
+                crate::nodes::eval_graph_to_fx_plan(
+                    project,
+                    seq,
+                    item,
+                    doc,
+                    t,
+                    opts,
+                    lw,
+                    lh,
+                    px_scale,
+                    sources,
+                    self_track,
+                    single_below_track,
+                )
             } else {
-                chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect()
+                chain
+                    .iter()
+                    .map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok))
+                    .collect::<Option<Vec<FxOp>>>()
+                    .map(|ops| crate::nodes::GpuGraphPlan { ops, blend_override: None })
             };
-            if let Some(ops) = ops {
+            if let Some(gplan) = gplan {
                 let m = Affine::scale(opts.scale as f64, opts.scale as f64)
                     .then_apply(&motion)
                     .then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
-                let fx = LayerFx { size: (lw as u32, lh as u32), decimation: n as u32, turns, ops };
-                out.push(PlanLayer { frame, matrix: m, opacity: op * extra_opacity, blend: bl, fx: Some(Arc::new(fx)), input });
+                let (eff_op, eff_bl) = match gplan.blend_override {
+                    Some((bmode, bop)) => (op * extra_opacity * bop, bmode),
+                    None => (op * extra_opacity, bl),
+                };
+                let fx = LayerFx { size: (lw as u32, lh as u32), decimation: n as u32, turns, ops: gplan.ops };
+                out.push(PlanLayer { frame, matrix: m, opacity: eff_op, blend: eff_bl, fx: Some(Arc::new(fx)), input });
                 return;
             }
         }

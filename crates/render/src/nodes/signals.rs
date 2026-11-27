@@ -341,36 +341,37 @@ pub(crate) fn compute_audio_rms_map(
     result
 }
 
-pub(crate) fn count_wire_uses(doc: &NodeGraphDoc) -> HashMap<usize, usize> {
+pub(crate) fn count_wire_uses(doc: &NodeGraphDoc) -> HashMap<(usize, usize), usize> {
     let mut counts = HashMap::new();
     for w in &doc.wires {
-        *counts.entry(w.out_node).or_insert(0) += 1;
+        *counts.entry((w.out_node, w.out_pin)).or_insert(0) += 1;
     }
     counts
 }
 
 pub(crate) fn take_or_clone_texture(
     doc: &NodeGraphDoc,
-    textures: &mut HashMap<usize, Image>,
-    use_counts: &mut HashMap<usize, usize>,
+    textures: &mut HashMap<(usize, usize), Image>,
+    use_counts: &mut HashMap<(usize, usize), usize>,
     node_id: usize,
     pin: usize,
     w: usize,
     h: usize,
 ) -> Image {
-    let Some((src_id, _)) = doc.source_for_pin(node_id, pin) else {
+    let Some((src_id, out_pin)) = doc.source_for_pin(node_id, pin) else {
         return Image::new(w, h);
     };
-    if let Some(cnt) = use_counts.get_mut(&src_id) {
+    let key = (src_id, out_pin);
+    if let Some(cnt) = use_counts.get_mut(&key) {
         *cnt = cnt.saturating_sub(1);
         if *cnt == 0
-            && let Some(img) = textures.remove(&src_id)
+            && let Some(img) = textures.remove(&key)
         {
             return img;
         }
     }
     textures
-        .get(&src_id)
+        .get(&key)
         .cloned()
         .unwrap_or_else(|| Image::new(w, h))
 }
