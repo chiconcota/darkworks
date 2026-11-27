@@ -1,6 +1,6 @@
 # SỔ BÀN GIAO TIẾN ĐỘ CA KÍP: DARKWORKS (checkpoint.md)
 @project: DARKWORKS | @phòng_ban: Toàn xưởng | @status: 🟢 Hoàn Tất `Ultra Keyer` Pro GPU + 14 `NodeFxOp` + Shared Eyedropper + Refactor `gpu_plan.rs`
-@session_end: 2026-11-27 | @next_session_focus: Test thực tế các Atomic Nodes còn lại trên Node Graph & triển khai **Node & Preset Library Browser** (`Task 3.13`)
+@session_end: 2026-11-27 | @next_session_focus: Tập trung test thực tế & hoàn thiện toàn bộ Atomic Nodes còn lại trên Node Graph (chưa làm sang Node/Preset Library Browser)
 
 > Sổ ghi chép bàn giao công việc giữa các phiên làm việc của AI.  
 > Khi mở phiên mới (`/start_session`), nhân viên đọc file này để nắm tiến độ dở dang trong 3 giây.
@@ -50,6 +50,5 @@
 - [ ] **1. Test thực tế các Atomic Nodes còn lại trên giao diện & video 4K/1080p:**
   - Kiểm thử từng nhóm: `ColorGrade` (Lumetri tonal + Split Tone), `BlurSharpen` (6 kiểu gồm `RadialZoom` và `BokehBloom`), `DistortLens` (13 kiểu), `CropMask`, `Transform2D`, `Blend`, `AudioReactor`, `TimeDriver`, `TextGenerator`, `ShapeGenerator`, `Reroute`, `CustomWgsl`.
   - Theo dõi trường hợp Người Dùng phát hiện trên `Node Graph FX` (Properties panel hiện `Position: NaN X NaN Y` / `Anchor point: NaN X NaN Y` khi tạo overlay FX Clip — kiểm tra RCA nếu Người Dùng yêu cầu ở ca sau).
-- [ ] **2. Theo dõi các tồn đọng đã ghi nhận cho Phase 4:**
-  - `DAG Multi-Texture Pool` trên GPU (đồ thị đa nhánh phức tạp không fallback CPU) và `Transition` node trên GPU (`gpu_plan.rs` / `node_fx.wgsl`).
-  - Triển khai **Node & Preset Library Browser** (`Task 3.13`) và chuyển sang Giai đoạn 4 (Vello Canvas 2D + Keyframe Node Graph).
+- [ ] **2. Chưa chuyển sang Thư viện Preset (`Task 3.13`) ở ca sau:**
+  - Giữ phạm vi ca sau thuần túy ở việc kiểm thử, tối ưu GPU/UX cho các Atomic Nodes còn lại (`Transition`, đa nhánh DAG... nếu phát sinh khi test); chỉ chuyển sang **Node & Preset Library Browser** (`Task 3.13`) khi Người Dùng xác nhận đã test xong các Node.
