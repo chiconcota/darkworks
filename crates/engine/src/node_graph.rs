@@ -186,26 +186,138 @@ fn set_on_clip(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({ "updated": updated }))
 }
 
+fn parse_video_track_index(seq: &Sequence, track_name: &str) -> Option<usize> {
+    let key = track_name.trim();
+    if let Some(rest) = key.strip_prefix('V').or_else(|| key.strip_prefix('v'))
+        && let Ok(one_based) = rest.parse::<usize>()
+        && let Some(idx) = one_based.checked_sub(1)
+        && idx < seq.video_tracks.len()
+    {
+        return Some(idx);
+    }
+    seq.video_tracks
+        .iter()
+        .position(|tr| tr.name.eq_ignore_ascii_case(key))
+}
+
+fn find_transition_overlap(
+    pr: &filmcraft_project::Project,
+    seq: &Sequence,
+    playhead: Tick,
+    tracks: &[String],
+) -> Option<(Tick, Tick)> {
+    let mut explicit: Vec<usize> = Vec::new();
+    for name in tracks {
+        if let Some(idx) = parse_video_track_index(seq, name)
+            && !explicit.contains(&idx)
+        {
+            explicit.push(idx);
+        }
+    }
+
+    let n = seq.video_tracks.len();
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    if explicit.len() >= 2 {
+        pairs.push((explicit[0], explicit[1]));
+    } else if explicit.len() == 1 {
+        let a = explicit[0];
+        for b in 0..n {
+            if b != a {
+                pairs.push((a, b));
+            }
+        }
+    } else {
+        for a in 0..n {
+            for b in (a + 1)..n {
+                pairs.push((a, b));
+            }
+        }
+    }
+
+    let is_media = |it: &filmcraft_project::TrackItem| {
+        it.enabled
+            && pr
+                .item(it.item)
+                .is_some_and(|src| !matches!(src.kind, ItemKind::AdjustmentLayer { .. }))
+    };
+
+    let mut best: Option<(Tick, Tick)> = None;
+    for (ia, ib) in pairs {
+        let (Some(ta), Some(tb)) = (seq.video_tracks.get(ia), seq.video_tracks.get(ib)) else {
+            continue;
+        };
+        if !ta.enabled || !tb.enabled {
+            continue;
+        }
+        for a in ta.items.iter().filter(|it| is_media(it)) {
+            for b in tb.items.iter().filter(|it| is_media(it)) {
+                let ov_start = a.start.max(b.start);
+                let ov_end = a.end().min(b.end());
+                if ov_end > ov_start && playhead >= ov_start && playhead <= ov_end {
+                    let ov_dur = ov_end - ov_start;
+                    if best.is_none_or(|(_, bdur)| ov_dur < bdur) {
+                        best = Some((ov_start, ov_dur));
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
 fn create_overlay_clip(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "nodeGraph.createOverlayClip";
     let doc = parse_graph(p, cmd)?;
     let name = str_p(p, "name").unwrap_or("Node Graph FX");
     let use_in_out = bool_p(p, "useMarkInOut").unwrap_or(true);
     let want_track = u64_p(p, "track").map(|v| v as usize);
+    let explicit_secs = f64_p(p, "seconds");
 
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
-    let (start, dur) = if use_in_out
+    let playhead = s.playhead();
+    let hint = doc.overlay_hint();
+
+    let (start, dur, reason) = if use_in_out
         && let (Some(i), Some(o)) = (seq.mark_in, seq.mark_out)
         && o > i
     {
-        (i, o - i)
+        (i, o - i, "markInOut")
+    } else if let Some(secs) = explicit_secs {
+        (playhead, Tick::from_seconds_f64(secs.max(0.05)), "explicitSeconds")
+    } else if hint.has_transition {
+        let overlap = find_transition_overlap(&s.project, seq, playhead, &hint.transition_tracks);
+        if let Some(driver_secs) = hint.driver_duration_sec {
+            let dur = Tick::from_seconds_f64(driver_secs.max(0.05));
+            let start = if let Some((ov_start, ov_dur)) = overlap {
+                let ov_end = ov_start + ov_dur;
+                if dur <= ov_dur && playhead + dur > ov_end {
+                    (ov_end - dur).max(ov_start)
+                } else if dur > ov_dur {
+                    ov_start
+                } else {
+                    playhead.max(ov_start)
+                }
+            } else {
+                playhead
+            };
+            (start, dur, "timeDriver")
+        } else if let Some((ov_start, ov_dur)) = overlap {
+            (ov_start, ov_dur, "overlap")
+        } else {
+            (playhead, Tick::from_seconds_f64(2.0), "transitionDefault")
+        }
     } else {
-        let secs = f64_p(p, "seconds").unwrap_or(5.0).max(0.05);
-        (s.playhead(), Tick::from_seconds_f64(secs))
+        (playhead, Tick::from_seconds_f64(5.0), "default")
     };
 
     let clip_id = place_overlay_with_graph(s, cmd, name, start, dur, want_track, doc)?;
-    Ok(json!({ "clip": clip_id.0, "start": start.0, "duration": dur.0 }))
+    Ok(json!({
+        "clip": clip_id.0,
+        "start": start.0,
+        "duration": dur.0,
+        "durationSec": dur.seconds(),
+        "reason": reason,
+    }))
 }
 
 fn parse_scope(raw: Option<&str>, cmd: &str) -> Result<ActionScope> {
@@ -357,7 +469,7 @@ mod tests {
     use darkworks_node_graph_core::{DarkNode, NodeEntry, NodeGraphDoc, NodeWire, ShapeType};
     use serde_json::json;
 
-    use crate::Session;
+    use crate::{EngineError, Session};
 
     fn sample_doc() -> NodeGraphDoc {
         NodeGraphDoc {
@@ -420,5 +532,130 @@ mod tests {
         s.execute("edit.undo", json!({})).expect("undo");
         let seq_after = s.active_sequence().expect("seq");
         assert!(seq_after.find_item(filmcraft_project::ClipId(clip_id)).is_none());
+    }
+
+    fn transition_doc(speed: f32, mode: darkworks_node_graph_core::TimeMode, with_driver: bool) -> NodeGraphDoc {
+        use darkworks_node_graph_core::TransitionType;
+        let mut nodes = vec![
+            NodeEntry {
+                id: 0,
+                pos: [0.0, 0.0],
+                node: DarkNode::VideoInput { track_name: "V1".into() },
+                custom_title: None,
+            },
+            NodeEntry {
+                id: 1,
+                pos: [0.0, 100.0],
+                node: DarkNode::VideoInput { track_name: "V2".into() },
+                custom_title: None,
+            },
+            NodeEntry {
+                id: 2,
+                pos: [240.0, 50.0],
+                node: DarkNode::default_transition(TransitionType::CrossDissolve, 0.5, 0.1),
+                custom_title: None,
+            },
+            NodeEntry {
+                id: 3,
+                pos: [460.0, 50.0],
+                node: DarkNode::Output,
+                custom_title: None,
+            },
+        ];
+        let mut wires = vec![
+            NodeWire { out_node: 0, out_pin: 0, in_node: 2, in_pin: 0 },
+            NodeWire { out_node: 1, out_pin: 0, in_node: 2, in_pin: 1 },
+            NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 0 },
+        ];
+        if with_driver {
+            nodes.push(NodeEntry {
+                id: 4,
+                pos: [0.0, 220.0],
+                node: DarkNode::default_time_driver(speed, mode),
+                custom_title: None,
+            });
+            wires.push(NodeWire { out_node: 4, out_pin: 0, in_node: 2, in_pin: 2 });
+        }
+        NodeGraphDoc {
+            nodes,
+            wires,
+            groups: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn transition_overlay_respects_timedriver_markzone_and_overlap() {
+        use darkworks_node_graph_core::TimeMode;
+        use filmcraft_project::{ItemKind, Label, Track, TrackKind};
+        use filmcraft_time::{FrameRate, Tick, TimeRange};
+
+        let mut s = Session::default();
+        s.execute("file.openDemoProject", json!({})).expect("open demo");
+        let seq_id = s.state.active_sequence.expect("seq");
+
+        // 1. TimeDriver Linear 2s (speed = 0.5), không Mark In/Out -> tạo FX Clip đúng 2.0s
+        let doc_2s = serde_json::to_value(transition_doc(0.5, TimeMode::Linear, true)).expect("doc");
+        let res_td = s
+            .execute(
+                "nodeGraph.createOverlayClip",
+                json!({ "name": "Trans 2s", "useMarkInOut": true, "graph": doc_2s }),
+            )
+            .expect("create 2s");
+        assert_eq!(res_td["reason"], "timeDriver");
+        assert!((res_td["durationSec"].as_f64().unwrap_or(0.0) - 2.0).abs() < 0.05);
+
+        // 2. Có Mark In/Out = 3s dù TimeDriver là 2s -> tôn trọng Mark In/Out 3.0s
+        let _ = s.edit("set mark", |pr, _| {
+            let q = pr.sequence_mut(seq_id).ok_or(EngineError::NoSequence)?;
+            q.mark_in = Some(Tick::from_seconds_f64(1.0));
+            q.mark_out = Some(Tick::from_seconds_f64(4.0));
+            Ok(())
+        });
+        let res_mark = s
+            .execute(
+                "nodeGraph.createOverlayClip",
+                json!({
+                    "name": "Trans Mark 3s",
+                    "useMarkInOut": true,
+                    "graph": serde_json::to_value(transition_doc(0.5, TimeMode::Linear, true)).expect("doc")
+                }),
+            )
+            .expect("create mark 3s");
+        assert_eq!(res_mark["reason"], "markInOut");
+        assert!((res_mark["durationSec"].as_f64().unwrap_or(0.0) - 3.0).abs() < 0.05);
+
+        // 3. Bỏ Mark In/Out, tạo 2 clip gối đầu trên V1 [0..4s] & V2 [2.5..6s] (overlap 1.5s), Clip01 -> bắt khít [2.5..4.0s]
+        let _ = s.edit("setup overlap", |pr, _| {
+            let rate = FrameRate::new(30, 1);
+            let src1 = pr.add_item("A", Label::Iris, ItemKind::Graphic { width: 128, height: 128, rate }, None);
+            let src2 = pr.add_item("B", Label::Iris, ItemKind::Graphic { width: 128, height: 128, rate }, None);
+            let it1 = pr.make_track_item(src1, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, Tick::from_seconds_f64(4.0)), rate).expect("it1");
+            let it2 = pr.make_track_item(src2, TrackKind::Video, Tick::from_seconds_f64(2.5), TimeRange::new(Tick::ZERO, Tick::from_seconds_f64(3.5)), rate).expect("it2");
+            let tid2 = filmcraft_project::TrackId(pr.alloc_id());
+            let q = pr.sequence_mut(seq_id).ok_or(EngineError::NoSequence)?;
+            q.mark_in = None;
+            q.mark_out = None;
+            q.video_tracks[0].items = vec![it1];
+            if q.video_tracks.len() < 2 {
+                q.video_tracks.push(Track::new(tid2, TrackKind::Video, "Video 2".into()));
+            }
+            q.video_tracks[1].items = vec![it2];
+            Ok(())
+        });
+        s.set_playhead(Tick::from_seconds_f64(3.0));
+        let res_ov = s
+            .execute(
+                "nodeGraph.createOverlayClip",
+                json!({
+                    "name": "Trans Overlap",
+                    "useMarkInOut": true,
+                    "graph": serde_json::to_value(transition_doc(1.0, TimeMode::Clip01, true)).expect("doc")
+                }),
+            )
+            .expect("create overlap");
+        assert_eq!(res_ov["reason"], "overlap");
+        let start_s = Tick(res_ov["start"].as_i64().unwrap_or(0)).seconds();
+        assert!((start_s - 2.5).abs() < 0.05);
+        assert!((res_ov["durationSec"].as_f64().unwrap_or(0.0) - 1.5).abs() < 0.05);
     }
 }

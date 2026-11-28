@@ -15,7 +15,7 @@ pub mod preset;
 pub mod types;
 
 pub use custom_shader::{WgslError, WgslParser, WgslUniform};
-pub use doc::{NodeEntry, NodeGraphDoc, NodeWire, VisualGroupDoc};
+pub use doc::{NodeEntry, NodeGraphDoc, NodeWire, OverlayPlacementHint, VisualGroupDoc};
 pub use evaluator::{DagDocPlan, DagDocStep, DagError, DagEvaluator, EvaluationContext};
 pub use node::{
     ActionScope, AudioBand, BlendMode, BlurDimensions, BlurType, DarkNode, DistortType,

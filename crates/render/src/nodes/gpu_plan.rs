@@ -245,11 +245,18 @@ fn compile_chain_ops(
     sources: Option<&dyn SourceProvider>,
 ) -> Option<Vec<FxOp>> {
     let time_sec = (t - item.start).seconds().max(0.0);
+    let clip_duration_sec = item.duration.seconds().max(0.0);
     let audio_map: HashMap<usize, f32> = sources
         .map(|s| compute_audio_rms_map(project, seq, item, t, plan, s))
         .unwrap_or_default();
     let fallback_rms = audio_map.values().copied().next().unwrap_or(0.0);
-    let sig_ctx = DagEvaluator::evaluate_signals_with_audio(plan, time_sec, fallback_rms, &audio_map);
+    let sig_ctx = DagEvaluator::evaluate_signals_for_clip(
+        plan,
+        time_sec,
+        clip_duration_sec,
+        fallback_rms,
+        &audio_map,
+    );
 
     let sx = lw as f32 / seq.settings.width.max(1) as f32;
     let sy = lh as f32 / seq.settings.height.max(1) as f32;

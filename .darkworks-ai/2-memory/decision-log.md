@@ -394,3 +394,13 @@
   3. **Quy hoạch `CropMask` & `Transform 3D`:**
      - **`CropMask` (Phase 4 — `Task 4.7`, Cách 1):** Giữ 1 Node `Crop / Mask` đa năng với 2 chế độ (`Edge Crop` 4 cạnh + `Bezier / Pen Mask` nối công cụ bút/Ellipse/Polygon trực tiếp trên Program Monitor từ `masks.rs` & `mask.wgsl`, bổ sung chân `Matte Out`).
      - **`Transform 3D` (Phase 7 — `Task 7.1`, sau Milestone/Production):** Tách thành Atomic Node độc lập (Lightworks 3D DVE / Homography 3×3: `Pos X/Y/Z`, `Rot X/Y/Z`, `Pivot`, `Perspective`, `Hide Backface`) tái sử dụng toán học từ `basic_3d` / `rotate_3d` và chạy GPU WGSL.
+
+### 43. Nâng Cấp UX `TimeDriver` (`Clip01` & `Duration`), `Add as FX Clip` Thông Minh Cho `Transition` & Dùng Chung Động Cơ Chuyển Cảnh FilmCraft (Phương Án A) (2026-11-28)
+- **Bối cảnh & RCA:**
+  - `Add as FX Clip` trước đó luôn gán cứng `seconds: 5.0` tại `playhead` khi không có Mark In/Out, còn `TimeDriver` chỉ chạy theo `time_sec * speed` và thiếu ô nhập `Duration (s)`, khiến FX Clip dài hơn hiệu ứng và phải move/resize thủ công.
+  - Ngoài ra `apply_transition` trong `transform_blend.rs` trước đó tự viết tay 8 nhánh rút gọn (như `ZoomPush` thu nhỏ Clip B còn `0.35x` lộ viền xám, thiếu easing & motion blur) thay vì gọi `crate::transitions::apply_scaled` của FilmCraft.
+- **Quyết định kiến trúc & Giải pháp:**
+  1. **`TimeDriver` (`Clip 0→1` & `Duration (s)` đồng bộ `Speed`):** Bổ sung `TimeMode::Clip01` (`(timeline_time_sec / clip_duration_sec).clamp(0.0, 1.0)`) và `DagEvaluator::evaluate_signals_for_clip`; thêm ô `Duration (s)` đồng bộ 2 chiều với `Speed` (`1.0 / duration`) cho `Linear`/`SineLoop`/`PingPong`.
+  2. **`Add as FX Clip` thông minh (`NodeGraphDoc::overlay_hint` + `create_overlay_clip`):** Ưu tiên theo thứ tự: `Mark [In, Out]` (tôn trọng 100% vùng đánh dấu, vd Markzone `3s` + `TimeDriver 2s` chạy `2s` đầu giữ cuối) ➔ `TimeDriver` theo giây (vd `2s`, tự kẹp trong vùng overlap nếu đang đứng trên overlap) ➔ tự bắt vùng giao nhau (`Overlap`) khi dùng `Clip01` hoặc chưa có `TimeDriver` ➔ mặc định `2.0s` cho `Transition` (`5.0s` cho đồ thị khác).
+  3. **Phương án A cho `DarkNode::Transition`:** Giữ nguyên độ gọn Atomic 8 kiểu, chuyển `apply_transition` sang gọi chung `vtransition::find_transition` + `crate::transitions::apply_scaled` (`film_dissolve`, `linear_wipe`, `push`, `iris_round`, `motion_camera`, `dip_to_color`, `blur_dissolve`), hỗ trợ cả 2 clip gối đầu lẫn 1 clip chuyển sang đen.
+  4. **Giữ tính minh bạch Node Graph:** Không thêm chế độ `Auto` ngầm vào `Transition` (tránh trùng lặp với `TimeDriver (Clip01)` và giấu luồng tín hiệu). Ghi chú tồn đọng về Wipe hình học Vello (`Task 4.3`), chuyển cảnh 3D (`Task 7.1`/`7.2`) và Optical Flow `Morph Cut` (`Task 7.2`) vào `master-plan-a-z.md`.

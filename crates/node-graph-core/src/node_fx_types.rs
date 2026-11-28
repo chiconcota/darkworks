@@ -36,6 +36,8 @@ pub enum TimeMode {
     Linear,
     SineLoop,
     PingPong,
+    /// Chuẩn hóa tiến trình `0.0 -> 1.0` theo toàn bộ độ dài Clip trên Timeline.
+    Clip01,
 }
 
 /// 27 chế độ hòa trộn của `Blend` (khớp 100% với `filmcraft_render::Blend`, kèm `Add` tương thích ngược)

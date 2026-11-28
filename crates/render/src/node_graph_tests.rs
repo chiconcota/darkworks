@@ -340,3 +340,42 @@ fn keyer_garbage_matte_and_matte_out_pin_work() {
     assert!(out.get(16, 16)[3] > 0.99, "inside garbage matte stays white/opaque");
     assert!(out.get(1, 1)[3] < 0.01, "outside garbage matte is clipped out");
 }
+
+#[test]
+fn transition_uses_filmcraft_engine_without_shrunken_border_artifacts() {
+    use darkworks_node_graph_core::{TransitionDirection, TransitionType};
+
+    let a = Image::filled(64, 36, [0.9, 0.2, 0.1, 1.0]);
+    let b = Image::filled(64, 36, [0.1, 0.4, 0.95, 1.0]);
+
+    // ZoomPush tại p=0.5 không bị thu nhỏ lộ viền trống/xám ở góc
+    let zp = crate::nodes::apply_transition(
+        &a,
+        &b,
+        TransitionType::ZoomPush,
+        0.5,
+        0.1,
+        TransitionDirection::Left,
+        1.0,
+    );
+    assert!(zp.get(1, 1)[3] > 0.99, "ZoomPush corner must remain fully opaque");
+    assert!(zp.get(32, 18)[3] > 0.99);
+
+    // Chuyển đổi qua cả 8 kiểu và test 1 clip sang đen (b rỗng)
+    let black = Image::new(64, 36);
+    for ty in [
+        TransitionType::CrossDissolve,
+        TransitionType::LinearWipe,
+        TransitionType::Slide,
+        TransitionType::Iris,
+        TransitionType::ZoomPush,
+        TransitionType::DipBlack,
+        TransitionType::DipWhite,
+        TransitionType::BlurDissolve,
+    ] {
+        let mid = crate::nodes::apply_transition(&a, &b, ty, 0.5, 0.15, TransitionDirection::Left, 1.0);
+        assert_eq!((mid.w, mid.h), (64, 36));
+        let single = crate::nodes::apply_transition(&a, &black, ty, 1.0, 0.1, TransitionDirection::Left, 1.0);
+        assert!(single.get(32, 18)[3] < 0.01, "single-clip transition {ty:?} at p=1.0 fades cleanly to empty/black");
+    }
+}

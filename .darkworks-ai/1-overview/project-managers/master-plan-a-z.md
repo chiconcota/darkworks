@@ -130,6 +130,7 @@ flowchart TD
   - Chế độ Karaoke: Đổi màu từng chữ theo nhịp giọng nói dựa trên đơn vị `Tick`.
 - [ ] **Task 4.3 [Node Shape & Vector (SVG)]:**
   - Node vẽ vector: Chữ nhật bo góc, hình tròn, đa giác, nạp file `.svg` sắc nét vô cực ở mọi độ phân giải.
+  - **Tồn đọng Transition (Wipe hình học & viền phát sáng):** Dùng Vello sinh Mask vector phức tạp (`Clock Wipe`, `Star Wipe`, `Shape Dissolve`, hình tim, chữ làm mask) cắm vào `Blend` / `BlurSharpen (BokehBloom)` để tạo hiệu ứng chuyển cảnh đồ họa sắc nét trên GPU.
 - [ ] **Task 4.4 [Node Canvas Composite]:**
   - Gom cụm chữ, hình khối và thanh viền thành cụm đồ họa hoàn chỉnh (Lower-third tin tức, bảng phụ đề).
 - [ ] **Task 4.5 [Keyframe Trực Tiếp Trên Tham Số Node (`DarkNode` Keyframing)]:**
@@ -199,6 +200,11 @@ flowchart TD
   - Tách bạch thành Atomic Node độc lập với `Transform 2D` (dùng phép chiếu phối cảnh Homography 3×3 thay cho Affine 2×3).
   - Tham số đầy đủ: `Pos X/Y/Z` (xa/gần camera), `Rot X (Tilt)`, `Rot Y (Swivel)`, `Rot Z (Roll)`, `Pivot X/Y/Z`, `Perspective (FOV)`, `Hide Backface`, cùng các socket `Mod` điều khiển theo `TimeDriver` / `AudioReactor` / `KeyframeCurve`.
   - Tái sử dụng nền toán học từ `basic_3d` (`crates/render/src/effects.rs`) & `rotate_3d` (`crates/render/src/vfx/distort.rs`), biên dịch sang shader Compute WGSL trong `crates/gpu/src/node_fx.wgsl` để chạy 100% GPU 60fps.
+- [ ] **Task 7.2 [Mở Rộng Nhóm Transition Đặc Thù & Optical Flow (Tồn Đọng 2026-11-28)]:**
+  - Hiện tại `DarkNode::Transition` áp dụng **Phương án A** (8 kiểu cốt lõi dùng chung động cơ `transitions::apply_scaled` của FilmCraft). Các hiệu ứng không ghép được từ Atomic Nodes 2D hiện có được ghi nhận xử lý sau:
+    1. **Chuyển cảnh 3D thật (`Page Peel` uốn trụ + bóng đổ, `3D Spin`, `Cube Spin`, `3D Roll`, `Flip/Fold Motion`):** Kết hợp `Transform 3D` (Task 7.1) hoặc mở chế độ `effect_id` qua `cards.rs` / `motion.rs` của FilmCraft.
+    2. **Optical Flow (`Morph Cut`) & Burn FBM:** Tái sử dụng `crate::flow::interpolate` / `burn_alpha` (kết hợp Phase 5 AI/Flow hoặc mở rộng `Transition` nếu cần full 84 hiệu ứng từ `vtransition.rs`).
+    3. **Tối ưu GPU cho `Transition`:** Hiện `transitions::apply_scaled` chạy CPU; cân nhắc đưa các chế độ phổ biến sang GPU WGSL nếu phát `4K` bị nghẽn.
 
 ---
 

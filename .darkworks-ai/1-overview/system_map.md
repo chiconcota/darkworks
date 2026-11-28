@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, `Ultra Keyer` Pro + 15 `NodeFxOp` GPU Compute (`node_fx.wgsl`), Shared Eyedropper, `Transform2D` Pro GPU (`Uniform`, `Skew`, `ResampleArea`), `gpu_plan.rs` (Single-wired `Blend`, `Blend(V1/All Below)`, `AdjustmentLayer`), Kho Preset `.preset.json`. | Phiên sau: nâng cấp `Transition` + `TimeDriver (Clip01)` & test thực tế các Atomic Nodes còn lại (chưa triển khai `Task 3.9` Thư viện Preset). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.14) | `crates/node-graph-core` (L0), `egui_snarl`, `Ultra Keyer` Pro + 15 `NodeFxOp` GPU Compute (`node_fx.wgsl`), Shared Eyedropper, `Transform2D` Pro GPU (`Uniform`, `Skew`, `ResampleArea`), `TimeDriver (Clip01/Duration)`, `Add as FX Clip` thông minh & `Transition` dùng chung FilmCraft `apply_scaled`, Kho Preset `.preset.json`. | Test nốt các Atomic Nodes còn lại (`ColorGrade`, `BlurSharpen`, `DistortLens`, `AudioReactor`, `Text/Shape`, `CustomWgsl`) trước khi sang `Task 3.9` Thư viện Preset. |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -123,6 +123,11 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-28 (Ca 2 — `TimeDriver` `Clip01` / `Duration`, `Add as FX Clip` Thông Minh & `Transition` Dùng Chung FilmCraft `apply_scaled`):**
+  - Thêm `TimeMode::Clip01` (`0.0 -> 1.0` theo `item.duration` via `DagEvaluator::evaluate_signals_for_clip`) và ô `Duration (s)` đồng bộ 2 chiều với `Speed` trên `TimeDriver` (`node_controls.rs`).
+  - Nâng cấp `nodeGraph.createOverlayClip` (`NodeGraphDoc::overlay_hint` + `find_transition_overlap`): tự căn FX Clip theo `Mark [In, Out]` > `TimeDriver` > `Overlap` > `2.0s` mặc định cho `Transition` (`5.0s` cho đồ thị khác), trả `durationSec`/`reason` về thanh trạng thái.
+  - Chuyển `DarkNode::Transition` sang **Phương án A** dùng chung `vtransition::find_transition` + `crate::transitions::apply_scaled` của FilmCraft (`film_dissolve`, `linear_wipe`, `push`, `iris_round`, `motion_camera`, `dip_to_color`, `blur_dissolve`), hết lỗi thu nhỏ lộ viền xám ở `ZoomPush` và hỗ trợ chuyển 1 clip sang đen. Ghi chú tồn đọng Wipe Vello (`Task 4.3`) & 3D/Optical Flow (`Task 7.2`) vào [master-plan-a-z.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/master-plan-a-z.md).
 
 - **2026-11-28 (Nâng Cấp `Transform2D` 100% GPU `ResampleArea`, `Blend` Nối 1 Dây GPU & Quy Hoạch `CropMask` / `Transform 3D`):**
   - Khắc phục lỗi rớt CPU khi `Blend` mới nối 1 dây (`Background` hoặc `Foreground`, không nối `Mask`) trong `gpu_plan.rs`, bổ sung unit test `single_wired_blend_stays_on_gpu_layers`.

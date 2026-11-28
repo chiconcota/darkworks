@@ -310,18 +310,42 @@ pub fn render_node_body_for(node_id: NodeId, node: &mut DarkNode, ui: &mut Ui) {
                 vec2_axis,
             } => {
                 Grid::new(("tm_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
-                    ui.label("Speed:");
-                    drag_val(ui, DragValue::new(speed).speed(0.1));
-                    ui.end_row();
+                    let mode_label = match mode {
+                        TimeMode::Linear => "Linear",
+                        TimeMode::SineLoop => "SineLoop",
+                        TimeMode::PingPong => "PingPong",
+                        TimeMode::Clip01 => "Clip 0→1",
+                    };
                     ui.label("Mode:");
                     ComboBox::from_id_salt(("tm_mode", node_ptr))
-                        .selected_text(format!("{mode:?}"))
+                        .selected_text(mode_label)
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(mode, TimeMode::Linear, "Linear");
+                            ui.selectable_value(mode, TimeMode::Linear, "Linear (giây)");
+                            ui.selectable_value(mode, TimeMode::Clip01, "Clip 0→1 (theo Clip)");
                             ui.selectable_value(mode, TimeMode::SineLoop, "SineLoop");
                             ui.selectable_value(mode, TimeMode::PingPong, "PingPong");
                         });
                     ui.end_row();
+                    if *mode == TimeMode::Clip01 {
+                        ui.label("Range:");
+                        ui.weak("0.0 → 1.0 (theo Clip)");
+                        ui.end_row();
+                    } else {
+                        let mut dur_s = if *speed > 1e-4 { 1.0 / *speed } else { 1.0 };
+                        ui.label("Duration (s):");
+                        if drag_val(
+                            ui,
+                            DragValue::new(&mut dur_s).range(0.05..=600.0).speed(0.05).suffix("s"),
+                        )
+                        .changed()
+                        {
+                            *speed = (1.0 / dur_s.max(0.05)).clamp(0.001, 200.0);
+                        }
+                        ui.end_row();
+                        ui.label("Speed:");
+                        drag_val(ui, DragValue::new(speed).range(0.001..=200.0).speed(0.05));
+                        ui.end_row();
+                    }
                     ui.label("Amp:");
                     drag_val(ui, DragValue::new(amplitude).speed(0.05));
                     ui.end_row();

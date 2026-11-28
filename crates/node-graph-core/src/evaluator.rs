@@ -184,6 +184,18 @@ impl DagEvaluator {
         audio_rms_peak: f32,
         per_node_audio: &HashMap<usize, f32>,
     ) -> EvaluationContext {
+        Self::evaluate_signals_for_clip(plan, timeline_time_sec, 0.0, audio_rms_peak, per_node_audio)
+    }
+
+    /// Tính toán luồng tín hiệu số theo ngữ cảnh Clip (`timeline_time_sec` & `clip_duration_sec`) và bảng RMS riêng.
+    #[must_use]
+    pub fn evaluate_signals_for_clip(
+        plan: &DagDocPlan,
+        timeline_time_sec: f64,
+        clip_duration_sec: f64,
+        audio_rms_peak: f32,
+        per_node_audio: &HashMap<usize, f32>,
+    ) -> EvaluationContext {
         let mut ctx = EvaluationContext {
             timeline_time_sec,
             audio_rms_peak,
@@ -209,6 +221,13 @@ impl DagEvaluator {
                         TimeMode::PingPong => {
                             let rem = raw_time.abs() % 2.0;
                             if rem < 1.0 { rem } else { 2.0 - rem }
+                        }
+                        TimeMode::Clip01 => {
+                            if clip_duration_sec > 1e-6 {
+                                (timeline_time_sec / clip_duration_sec).clamp(0.0, 1.0) as f32
+                            } else {
+                                0.0
+                            }
                         }
                     };
                     let scalar = base * amplitude + offset;
@@ -287,5 +306,104 @@ impl DagEvaluator {
         }
 
         ctx
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::doc::{NodeEntry, NodeGraphDoc, NodeWire};
+    use crate::node_fx_types::TransitionType;
+
+    #[test]
+    fn time_driver_clip01_normalizes_by_clip_duration_and_clamps() {
+        let doc = NodeGraphDoc {
+            nodes: vec![
+                NodeEntry {
+                    id: 0,
+                    pos: [0.0, 0.0],
+                    node: DarkNode::default_time_driver(0.5, TimeMode::Clip01),
+                    custom_title: None,
+                },
+                NodeEntry {
+                    id: 1,
+                    pos: [200.0, 0.0],
+                    node: DarkNode::default_transition(TransitionType::CrossDissolve, 0.0, 0.1),
+                    custom_title: None,
+                },
+            ],
+            wires: vec![NodeWire {
+                out_node: 0,
+                out_pin: 0,
+                in_node: 1,
+                in_pin: 2,
+            }],
+            groups: Vec::new(),
+        };
+        let plan = DagEvaluator::build_execution_plan(&doc).expect("valid plan");
+        let empty = HashMap::new();
+
+        let start = DagEvaluator::evaluate_signals_for_clip(&plan, 0.0, 4.0, 0.0, &empty);
+        let mid = DagEvaluator::evaluate_signals_for_clip(&plan, 2.0, 4.0, 0.0, &empty);
+        let end = DagEvaluator::evaluate_signals_for_clip(&plan, 4.0, 4.0, 0.0, &empty);
+        let over = DagEvaluator::evaluate_signals_for_clip(&plan, 6.0, 4.0, 0.0, &empty);
+
+        assert!((start.scalar_outputs[&0] - 0.0).abs() < 1e-6);
+        assert!((mid.scalar_outputs[&0] - 0.5).abs() < 1e-6);
+        assert!((end.scalar_outputs[&0] - 1.0).abs() < 1e-6);
+        assert!((over.scalar_outputs[&0] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn overlay_hint_reads_linear_duration_through_reroute_and_tracks() {
+        let doc = NodeGraphDoc {
+            nodes: vec![
+                NodeEntry {
+                    id: 0,
+                    pos: [0.0, 0.0],
+                    node: DarkNode::VideoInput { track_name: "V1".into() },
+                    custom_title: None,
+                },
+                NodeEntry {
+                    id: 1,
+                    pos: [0.0, 100.0],
+                    node: DarkNode::VideoInput { track_name: "V2".into() },
+                    custom_title: None,
+                },
+                NodeEntry {
+                    id: 2,
+                    pos: [0.0, 200.0],
+                    node: DarkNode::default_time_driver(0.5, TimeMode::Linear),
+                    custom_title: None,
+                },
+                NodeEntry {
+                    id: 3,
+                    pos: [120.0, 200.0],
+                    node: DarkNode::Reroute {
+                        data_type: NodeDataType::Scalar,
+                    },
+                    custom_title: None,
+                },
+                NodeEntry {
+                    id: 4,
+                    pos: [300.0, 100.0],
+                    node: DarkNode::default_transition(TransitionType::CrossDissolve, 0.5, 0.1),
+                    custom_title: None,
+                },
+            ],
+            wires: vec![
+                NodeWire { out_node: 0, out_pin: 0, in_node: 4, in_pin: 0 },
+                NodeWire { out_node: 1, out_pin: 0, in_node: 4, in_pin: 1 },
+                NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 0 },
+                NodeWire { out_node: 3, out_pin: 0, in_node: 4, in_pin: 2 },
+            ],
+            groups: Vec::new(),
+        };
+
+        let hint = doc.overlay_hint();
+        assert!(hint.has_transition);
+        assert!(!hint.has_clip01_driver);
+        assert_eq!(hint.transition_tracks, vec!["V1".to_string(), "V2".to_string()]);
+        assert!(hint.driver_duration_sec.is_some_and(|d| (d - 2.0).abs() < 1e-4));
     }
 }

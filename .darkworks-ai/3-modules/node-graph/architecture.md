@@ -1,6 +1,6 @@
 # MODULE KIẾN TRÚC: NODE GRAPH & GPU COMPOSITOR (node-graph/architecture.md)
 @crate: `crates/node-graph-core` (L0) + `crates/node-graph` (L5) + `crates/render/src/node_graph.rs` & `nodes/` (L2) + `crates/gpu/src/{node_fx.rs, node_fx.wgsl, custom_wgsl.rs}` (L3)
-@engine: egui_snarl + wgpu + crates/text | @status: 🟢 Hoàn Thành `Ultra Keyer` Pro + 14 `NodeFxOp` GPU Compute Shaders + Shared Eyedropper + Linear/`Blend`/`FX Clip` GPU Planner (Phiên sau test toàn diện các Atomic Nodes khác)
+@engine: egui_snarl + wgpu + crates/text | @status: 🟢 Hoàn Thành `TimeDriver` (`Clip01`/`Duration`), `Add as FX Clip` Thông Minh & `Transition` Dùng Chung `transitions::apply_scaled` FilmCraft (Chờ test thêm các Atomic Nodes còn lại)
 
 ## 1. VAI TRÒ & TRÁCH NHIỆM
 Đây là trái tim đồ họa phân biệt Darkworks với FilmCraft và Premiere truyền thống. Module này thay thế hoàn toàn danh sách tuyến tính `Vec<EffectInstance>` bằng mạng lưới đồ thị có hướng không chu trình (Directed Acyclic Graph - DAG), hỗ trợ các container đóng gói (Black Node), trạm tự động hóa quy trình (Action Node), công cụ tổ chức canvas ComfyUI Style, và khả năng mở rộng vô hạn qua Code Node (Custom WGSL JIT Shader).
@@ -18,7 +18,7 @@
   1. `VideoInput`: Lấy texture khung hình video từ `Auto (Clip)`, `All Below`, hoặc track tường minh `V1`, `V2`, `V3`, `V4` (hỗ trợ cả FX Clip có giới hạn `MAX_VIDEO_INPUT_DEPTH = 4` chống lặp).
   2. `TextGenerator`: Sinh chữ động có alpha (`font_size`, `font_family` ComboBox từ `filmcraft_text`, `bold`, `italic`, `align`, `position`, `tracking`, `line_spacing`, `stroke_width` + `stroke_color`, và socket `Pos Mod (Vec2)`).
   3. `ShapeGenerator`: Vẽ hình khối chữ nhật bo góc, hình tròn, Solid Matte kèm `position`, `stroke_width` + `stroke_color`, `feather` (làm mềm viền Mask), và socket `Pos Mod (Vec2)`.
-  4. `TimeDriver`: Bộ đếm thời gian (`Linear`, `SineLoop`, `PingPong`), hỗ trợ `amplitude`, `offset`, `vec2_axis`, xuất cả `Time Value (Scalar)` lẫn `Vec2 Out (Vec2)`.
+  4. `TimeDriver`: Bộ đếm thời gian (`Linear`, `SineLoop`, `PingPong`, `Clip01`), hiển thị & đồng bộ 2 chiều `Duration (s)` ↔ `Speed` cho các mode theo giây, và chuẩn hóa `0.0..=1.0` theo `item.duration` qua `DagEvaluator::evaluate_signals_for_clip` khi chọn `Clip 0→1`; xuất cả `Time Value (Scalar)` lẫn `Vec2 Out (Vec2)`.
   5. `ColorGrade`: Chỉnh sáng/màu cơ bản (`exposure` + socket `Exp Mod`, `contrast`, `saturation`, `temperature`, `tint`, `gamma`, `tint_color`/`tint_amount`), `Invert Colors`, `Black & White`, và bộ Lumetri mở rộng (`highlights`, `shadows`, `whites`, `blacks`, `vibrance`, `faded_film`, `shadow_tint`, `highlight_tint`).
   6. `BlurSharpen`: Gom 6 thuật toán (`Gaussian`, `Box`, `Directional`, `BokehBloom`, `UnsharpMask`, `RadialZoom` — nay chạy GPU via `NodeFxOp::RadialZoom`) kèm `radius` + socket `Radius Mod (Scalar)`, `dimensions` (`Both`/`Horizontal`/`Vertical`), `repeat_edge`, `bokeh_sides` (Polygon shape 0..8), `center [X, Y]`, `angle_deg`, `highlight_boost`, `threshold`.
   7. `DistortLens`: Gom 13 hiệu ứng — cả 9 chế độ trước đây chạy CPU (`Pixelate`, `ChromaticAberration`, `RippleWave`, `FishEye`, `LensDistortion`, `Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace`) nay chạy 100% GPU via `node_fx.wgsl`, cùng 4 chế độ gốc (`Vignette`, `Mirror`, `Offset`, `Posterize`); UI trong `node_controls_fx.rs` tự động ẩn các ô không liên quan theo từng chế độ.
@@ -26,7 +26,7 @@
   9. `Transform2D`: Zoom (`Scale X/Y` + checkbox `Uniform` khóa `X = Y`), `Pan`, `Rotate`, `Skew` / `Skew Axis`, `Anchor`, `Opacity`, `[Flip H]`, `[Flip V]`; chạy **100% GPU** kể cả khi `|Scale| < 0.5` (`NodeFxOp::ResampleArea` siêu lấy mẫu `2×2..8×8`) hoặc nối `Scale Mod`.
   10. `CropMask`: Cắt xén 4 cạnh và làm mềm viền `feather` *(đã quy hoạch nâng cấp Cách 1 trong Phase 4 `Task 4.7`: thêm `Bezier / Pen Mask` nối `masks.rs` & `mask.wgsl` + `Matte Out`)*.
   11. `Blend`: Trộn 2 lớp hình ảnh với đầy đủ 27 chế độ hòa trộn của `filmcraft_render::Blend` (`BlendMode::ALL`, giữ `Add` tương thích ngược) và 3 cổng `Background`, `Foreground`, `Mask`; hỗ trợ pass-through / `AlphaAdjust` trên GPU khi nối 1 đầu.
-  12. `Transition`: Chuyển cảnh 8 kiểu (`CrossDissolve`, `LinearWipe`, `Slide`, `Iris`, `ZoomPush`, `DipBlack`, `DipWhite`, `BlurDissolve`) kèm `direction` (`Left`/`Right`/`Up`/`Down`), `progress` và `feather`.
+  12. `Transition`: Chuyển cảnh 8 kiểu (`CrossDissolve`, `LinearWipe`, `Slide`, `Iris`, `ZoomPush`, `DipBlack`, `DipWhite`, `BlurDissolve`) kèm `direction`, `progress`, `feather`; dùng chung động cơ `crate::transitions::apply_scaled` của FilmCraft (`film_dissolve`, `linear_wipe`, `push`, `iris_round`, `motion_camera`, `dip_to_color`, `blur_dissolve`), hỗ trợ cả 2 clip gối đầu lẫn 1 clip chuyển sang đen. Kết hợp `NodeGraphDoc::overlay_hint()` trong `createOverlayClip` để tự động căn độ dài/vị trí FX Clip theo `Mark In/Out` > `TimeDriver` > vùng giao nhau (`Overlap`) > mặc định `2.0s`.
   13. `AudioReactor`: Đọc RMS theo dải tần từ `Master Mix`, `Linked Audio` (`item.link`), hoặc track `A1..A4`, xuất `Peak Value (Scalar)` & `Vec2 Out (Vec2)` (điều khiển tuyến tính stops phơi sáng `Exp Mod * 2.5`).
   14. `ActionNode`: Trạm tự động hóa quy trình, nút `[ ▶ RUN WORKFLOW ]` gọi lệnh `Session::execute`, hoàn tác `Ctrl + Z`.
   15. `BlackNode`: Đóng gói cụm nodes thành 1 hộp đen, bộc lộ `Exposed Pins`, xuất/nạp `.preset.json`.
@@ -71,21 +71,21 @@
 
 ## 3. CẤU TRÚC PHÂN TẦNG SOURCE CODE
 ```text
-crates/node-graph-core/    # Layer 0 (không egui): node.rs (555d), node_fx_types.rs (279d), preset.rs, graph.rs, wgsl_parser.rs
-crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs (539d), node_controls_fx.rs (405d), viewer.rs (598d), preset.rs, history.rs, group.rs
+crates/node-graph-core/    # Layer 0 (không egui): doc.rs (181d), evaluator.rs (409d), node.rs (555d), node_fx_types.rs (281d), preset.rs, wgsl_parser.rs
+crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs (563d), node_controls_fx.rs (405d), viewer.rs (598d), preset.rs, history.rs, group.rs
 crates/render/src/
-├── node_graph.rs          # DAG execution dispatcher (473d: đường đa nhánh / Garbage Matte / Matte Out)
-├── node_graph_tests.rs    # Unit tests cho eval_item_graph
+├── node_graph.rs          # DAG execution dispatcher (480d: đường đa nhánh / Garbage Matte / Matte Out / clip_duration_sec)
+├── node_graph_tests.rs    # Unit tests cho eval_item_graph & Transition FilmCraft parity (381d)
 └── nodes/
-    ├── gpu_plan.rs        # Graph planner/scheduler (382d): Apply to Clip, Single-wired Blend, Blend(V1/All Below), AdjustmentLayer
+    ├── gpu_plan.rs        # Graph planner/scheduler (389d): Apply to Clip, Single-wired Blend, Blend(V1/All Below), AdjustmentLayer
     ├── gpu_plan_tests.rs  # Unit tests cho GPU planner (578d)
     ├── node_fx_ops.rs     # 15 NodeFxOp + CPU parity (550d, gồm ResampleArea)
     ├── node_fx_distort_cpu.rs # CPU parity helpers cho distort & resample_area_cpu (327d)
     ├── color.rs           # ColorGrade & Keyer (CPU + push_*_gpu_op, 383d)
     ├── blur_distort.rs    # BlurSharpen & DistortLens (CPU + push_*_gpu_ops, 450d)
-    ├── transform_blend.rs # Transform2D (Resample/ResampleArea/Skew), CropMask, Blend, Transition (338d)
+    ├── transform_blend.rs # Transform2D (Resample/ResampleArea/Skew), CropMask, Blend, Transition -> FilmCraft apply_scaled (308d)
     └── shape.rs / text.rs / signals.rs
 crates/gpu/src/            # node_fx.rs (198d) + node_fx.wgsl (526d), fx.rs + fx.wgsl, custom_wgsl.rs
-crates/engine/src/node_graph.rs # Lệnh Session::execute (nodeGraph.*)
-crates/ui-egui/src/panels/ # node_graph*, monitor.rs (Shared Eyedropper)
+crates/engine/src/node_graph.rs # Lệnh Session::execute (nodeGraph.*, 661d)
+crates/ui-egui/src/panels/ # node_graph*, node_graph_bridge.rs (401d), monitor.rs (Shared Eyedropper)
 ```

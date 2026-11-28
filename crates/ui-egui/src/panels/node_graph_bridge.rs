@@ -159,7 +159,7 @@ fn create_overlay_clip(app: &mut FilmcraftApp, state: &mut NodeGraphState) {
 
     match app.session.execute(
         "nodeGraph.createOverlayClip",
-        json!({ "name": clip_name, "useMarkInOut": true, "seconds": 5.0, "graph": graph_json }),
+        json!({ "name": clip_name, "useMarkInOut": true, "graph": graph_json }),
     ) {
         Ok(res) => {
             if let Some(cid) = res.get("clip").and_then(|v| v.as_u64()).map(ClipId) {
@@ -168,7 +168,17 @@ fn create_overlay_clip(app: &mut FilmcraftApp, state: &mut NodeGraphState) {
                 state.last_observed_selection = Some(cid);
                 state.last_synced_doc = Some(doc);
             }
-            state.status_message = format!("✔ Đã tạo Overlay FX Clip '{clip_name}' trên Timeline");
+            let dur_s = res.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let reason = res.get("reason").and_then(|v| v.as_str()).unwrap_or("default");
+            state.status_message = match reason {
+                "markInOut" => format!("✔ Đã tạo FX Clip '{clip_name}' ({dur_s:.2}s theo Mark In/Out)"),
+                "timeDriver" => format!("✔ Đã tạo FX Clip '{clip_name}' ({dur_s:.2}s theo TimeDriver)"),
+                "overlap" => format!("✔ Đã tạo FX Clip '{clip_name}' ({dur_s:.2}s khớp vùng giao nhau)"),
+                "transitionDefault" => {
+                    format!("✔ Đã tạo FX Clip '{clip_name}' ({dur_s:.2}s mặc định Transition)")
+                }
+                _ => format!("✔ Đã tạo Overlay FX Clip '{clip_name}' ({dur_s:.2}s) trên Timeline"),
+            };
         }
         Err(e) => {
             state.status_message = format!("✖ {e}");
