@@ -92,7 +92,7 @@ darkworks/
 | **User Interface (4 Panels)** | 🟢 Hoàn Thành | `crates/ui`: Bố cục 4 phân vùng (Bin, Viewport, Inspector, Timeline) 60fps + Video Viewport. | Hoàn thiện phím tắt và phóng to Timeline. |
 | **Media Player & Ring-Buffer** | 🟢 Hoàn Thành | `crates/media`: VA-API probe, LRU FrameCache (<2GB RAM), cpal A/V sync, Ffmpeg 1-hour prefetch worker 60 FPS. | Chuẩn bị tích hợp vào Timeline multi-track. |
 | **Timeline NLE Core** | 🟢 Hoàn Thành | Trục thời gian egui, cắt (Split), xóa (Ripple Delete / Extract), xóa rỗng (Lift), Mark In/Out Lightworks, quản lý `project.json` Hot-Reload. | Chuẩn bị tích hợp vào Node Graph DAG (Phase 3). |
-| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, `Ultra Keyer` Pro + 14 `NodeFxOp` GPU Compute (`node_fx.wgsl`), Shared Eyedropper, `gpu_plan.rs` (Self-track, `Blend(V1/All Below)`, `AdjustmentLayer`), Kho Preset `.preset.json`. | Test thực tế & hoàn thiện toàn bộ các Atomic Nodes còn lại (chưa triển khai `Task 3.13` Thư viện Preset). |
+| **Node Graph Engine (DAG)** | 🟡 Đang Hoàn Thiện (Phase 3.13) | `crates/node-graph-core` (L0), `egui_snarl`, `Ultra Keyer` Pro + 15 `NodeFxOp` GPU Compute (`node_fx.wgsl`), Shared Eyedropper, `Transform2D` Pro GPU (`Uniform`, `Skew`, `ResampleArea`), `gpu_plan.rs` (Single-wired `Blend`, `Blend(V1/All Below)`, `AdjustmentLayer`), Kho Preset `.preset.json`. | Phiên sau: nâng cấp `Transition` + `TimeDriver (Clip01)` & test thực tế các Atomic Nodes còn lại (chưa triển khai `Task 3.9` Thư viện Preset). |
 | **Canvas 2D Node (Vello)** | 🔴 Chưa Làm | Generator Node vẽ chữ Karaoke, hộp thoại, vector trực tiếp lên GPU. | Viết `render_canvas(tick)` bằng Vello. |
 | **Automation & MCP Server** | 🔴 Chưa Làm | Cổng MCP `rmcp` giao tiếp với Antigravity CLI, xử lý lệnh qua JSON. | Mở socket nội bộ lắng nghe lệnh CLI. |
 | **Local AI Worker** | 🔴 Chưa Làm | Luồng chạy Silero VAD (băm khoảng lặng), Whisper subtitle, và Visual AI (Face Swap / Rembg). | Tích hợp `ort` ONNX GPU runtime. |
@@ -123,6 +123,12 @@ flowchart TD
 ---
 
 ## 6. NHẬT KÝ THAY ĐỔI GẦN NHẤT (RECENT LOGS)
+
+- **2026-11-28 (Nâng Cấp `Transform2D` 100% GPU `ResampleArea`, `Blend` Nối 1 Dây GPU & Quy Hoạch `CropMask` / `Transform 3D`):**
+  - Khắc phục lỗi rớt CPU khi `Blend` mới nối 1 dây (`Background` hoặc `Foreground`, không nối `Mask`) trong `gpu_plan.rs`, bổ sung unit test `single_wired_blend_stays_on_gpu_layers`.
+  - Nâng cấp `Transform2D` thêm `Uniform Scale` (`Lock X = Y`), `Skew / Skew Axis`, và `NodeFxOp::ResampleArea` (`OP_NODE_RESAMPLE_AREA = 114` trong `node_fx.wgsl` + `resample_area_cpu` parity 1:1) giúp cả `|Scale| < 0.5` lẫn `Scale Mod` chạy **100% GPU** không còn rớt CPU.
+  - Chốt lộ trình trong [master-plan-a-z.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/master-plan-a-z.md): `CropMask` Cách 1 (`Edge Crop` + `Bezier / Pen Mask` trên Monitor + `Matte Out`) vào Phase 4 `Task 4.7`; tách Atomic Node `Transform 3D` (Lightworks 3D DVE) vào Phase 7 `Task 7.1` sau Milestone/Production.
+  - Phiên kế tiếp: làm UX `Transition` Node + `TimeDriver` chế độ `Clip01` (`0..1` theo độ dài Clip) + mặc định `2s` cho FX Clip chứa `Transition` để hết phải tự căn thời lượng thủ công.
 
 - **2026-11-27 (`Ultra Keyer` Pro GPU, 14 `NodeFxOp` Compute Shaders, Shared Eyedropper & Tách Domain `gpu_plan.rs`):**
   - Hoàn thành toàn bộ kế hoạch [ultra-keyer-pro-upgrade.md](file:///mnt/Data/darkworks/.darkworks-ai/1-overview/project-managers/ultra-keyer-pro-upgrade.md): nâng cấp `DarkNode::Keyer` lên chuẩn Pro (`ChromaKey` / `LumaKey`, `Composite` / `AlphaChannel` / `ColorChannel`, `Pedestal`, `Highlight`, `Shadow`, `Choke`, `Soften`, `Matte Contrast`, `Invert Matte`, `Desaturate`, `Spill Luma`, `Garbage Matte` / `Matte Out`) tương thích ngược `#[serde(default)]`, tách `crates/node-graph-core/src/node_fx_types.rs` (279 dòng).

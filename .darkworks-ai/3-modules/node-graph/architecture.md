@@ -23,9 +23,9 @@
   6. `BlurSharpen`: Gom 6 thuật toán (`Gaussian`, `Box`, `Directional`, `BokehBloom`, `UnsharpMask`, `RadialZoom` — nay chạy GPU via `NodeFxOp::RadialZoom`) kèm `radius` + socket `Radius Mod (Scalar)`, `dimensions` (`Both`/`Horizontal`/`Vertical`), `repeat_edge`, `bokeh_sides` (Polygon shape 0..8), `center [X, Y]`, `angle_deg`, `highlight_boost`, `threshold`.
   7. `DistortLens`: Gom 13 hiệu ứng — cả 9 chế độ trước đây chạy CPU (`Pixelate`, `ChromaticAberration`, `RippleWave`, `FishEye`, `LensDistortion`, `Twirl`, `FindEdges`, `NoiseGrain`, `TurbulentDisplace`) nay chạy 100% GPU via `node_fx.wgsl`, cùng 4 chế độ gốc (`Vignette`, `Mirror`, `Offset`, `Posterize`); UI trong `node_controls_fx.rs` tự động ẩn các ô không liên quan theo từng chế độ.
   8. `Keyer` (`Ultra Keyer` Pro): Hỗ trợ 2 chế độ (`ChromaKey` Y'CbCr Bt.709 3-pass `Matte -> Choke -> Finish` / `LumaKey` Luminance threshold/cutoff), 3 chế độ output (`Composite`, `AlphaChannel`, `ColorChannel`), đầy đủ bộ lọc (`Pedestal`, `Highlight`, `Shadow`, `Choke`, `Soften`, `Matte Contrast`, `Invert Matte`, `Desaturate`, `Spill Luma`), pin `Garbage Matte` (in pin 1) + `Matte Out` (out pin 1), và **Shared Eyedropper** hút màu trực tiếp trên Program Monitor (kèm auto-bypass tức thì).
-  9. `Transform2D`: Zoom (`Scale X/Y`), Pan, Rotate, Anchor, Opacity, và 2 toggle `[Flip H]`, `[Flip V]`.
-  10. `CropMask`: Cắt xén 4 cạnh và làm mềm viền `feather`.
-  11. `Blend`: Trộn 2 lớp hình ảnh với đầy đủ 27 chế độ hòa trộn của `filmcraft_render::Blend` (`BlendMode::ALL`, giữ `Add` tương thích ngược) và 3 cổng `Background`, `Foreground`, `Mask`.
+  9. `Transform2D`: Zoom (`Scale X/Y` + checkbox `Uniform` khóa `X = Y`), `Pan`, `Rotate`, `Skew` / `Skew Axis`, `Anchor`, `Opacity`, `[Flip H]`, `[Flip V]`; chạy **100% GPU** kể cả khi `|Scale| < 0.5` (`NodeFxOp::ResampleArea` siêu lấy mẫu `2×2..8×8`) hoặc nối `Scale Mod`.
+  10. `CropMask`: Cắt xén 4 cạnh và làm mềm viền `feather` *(đã quy hoạch nâng cấp Cách 1 trong Phase 4 `Task 4.7`: thêm `Bezier / Pen Mask` nối `masks.rs` & `mask.wgsl` + `Matte Out`)*.
+  11. `Blend`: Trộn 2 lớp hình ảnh với đầy đủ 27 chế độ hòa trộn của `filmcraft_render::Blend` (`BlendMode::ALL`, giữ `Add` tương thích ngược) và 3 cổng `Background`, `Foreground`, `Mask`; hỗ trợ pass-through / `AlphaAdjust` trên GPU khi nối 1 đầu.
   12. `Transition`: Chuyển cảnh 8 kiểu (`CrossDissolve`, `LinearWipe`, `Slide`, `Iris`, `ZoomPush`, `DipBlack`, `DipWhite`, `BlurDissolve`) kèm `direction` (`Left`/`Right`/`Up`/`Down`), `progress` và `feather`.
   13. `AudioReactor`: Đọc RMS theo dải tần từ `Master Mix`, `Linked Audio` (`item.link`), hoặc track `A1..A4`, xuất `Peak Value (Scalar)` & `Vec2 Out (Vec2)` (điều khiển tuyến tính stops phơi sáng `Exp Mod * 2.5`).
   14. `ActionNode`: Trạm tự động hóa quy trình, nút `[ ▶ RUN WORKFLOW ]` gọi lệnh `Session::execute`, hoàn tác `Ctrl + Z`.
@@ -71,21 +71,21 @@
 
 ## 3. CẤU TRÚC PHÂN TẦNG SOURCE CODE
 ```text
-crates/node-graph-core/    # Layer 0 (không egui): node.rs (532d), node_fx_types.rs (279d), preset.rs, graph.rs, wgsl_parser.rs
-crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs, node_controls_fx.rs (405d), viewer.rs, preset.rs, history.rs, group.rs
+crates/node-graph-core/    # Layer 0 (không egui): node.rs (555d), node_fx_types.rs (279d), preset.rs, graph.rs, wgsl_parser.rs
+crates/node-graph/         # Layer 5 (egui_snarl UI): doc.rs, node_controls.rs (539d), node_controls_fx.rs (405d), viewer.rs (598d), preset.rs, history.rs, group.rs
 crates/render/src/
-├── node_graph.rs          # DAG execution dispatcher (đường đa nhánh / Garbage Matte / Matte Out)
+├── node_graph.rs          # DAG execution dispatcher (473d: đường đa nhánh / Garbage Matte / Matte Out)
 ├── node_graph_tests.rs    # Unit tests cho eval_item_graph
 └── nodes/
-    ├── gpu_plan.rs        # Graph planner/scheduler (369d): Apply to Clip (Auto/Clip/track của clip), Blend(V1/All Below), AdjustmentLayer
-    ├── gpu_plan_tests.rs  # Unit tests cho GPU planner (392d)
-    ├── node_fx_ops.rs     # 14 NodeFxOp + CPU fallback thống nhất (536d)
-    ├── node_fx_distort_cpu.rs # CPU parity helpers cho hiệu ứng biến dạng (279d)
+    ├── gpu_plan.rs        # Graph planner/scheduler (382d): Apply to Clip, Single-wired Blend, Blend(V1/All Below), AdjustmentLayer
+    ├── gpu_plan_tests.rs  # Unit tests cho GPU planner (578d)
+    ├── node_fx_ops.rs     # 15 NodeFxOp + CPU parity (550d, gồm ResampleArea)
+    ├── node_fx_distort_cpu.rs # CPU parity helpers cho distort & resample_area_cpu (327d)
     ├── color.rs           # ColorGrade & Keyer (CPU + push_*_gpu_op, 383d)
     ├── blur_distort.rs    # BlurSharpen & DistortLens (CPU + push_*_gpu_ops, 450d)
-    ├── transform_blend.rs # Transform2D, CropMask, Blend, Transition (CPU + push_*_gpu_ops, 290d)
+    ├── transform_blend.rs # Transform2D (Resample/ResampleArea/Skew), CropMask, Blend, Transition (338d)
     └── shape.rs / text.rs / signals.rs
-crates/gpu/src/            # node_fx.rs (190d) + node_fx.wgsl (503d), fx.rs + fx.wgsl, custom_wgsl.rs
+crates/gpu/src/            # node_fx.rs (198d) + node_fx.wgsl (526d), fx.rs + fx.wgsl, custom_wgsl.rs
 crates/engine/src/node_graph.rs # Lệnh Session::execute (nodeGraph.*)
 crates/ui-egui/src/panels/ # node_graph*, monitor.rs (Shared Eyedropper)
 ```

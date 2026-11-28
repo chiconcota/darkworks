@@ -207,7 +207,7 @@ impl SnarlViewer<DarkNode> for DarkworksViewer {
         });
 
         ui.menu_button("📐 Transform & Motion", |ui| {
-            if ui.button("📐 Transform 2D").clicked() { snarl.insert_node(pos, DarkNode::Transform2D { position: [0.0, 0.0], scale: [1.0, 1.0], rotation_deg: 0.0, anchor: [0.5, 0.5], opacity: 1.0, flip_h: false, flip_v: false }); ui.close(); }
+            if ui.button("📐 Transform 2D").clicked() { snarl.insert_node(pos, DarkNode::default_transform()); ui.close(); }
             if ui.button("💧 Blur / Sharpen").clicked() { snarl.insert_node(pos, DarkNode::default_blur(BlurType::Gaussian, 10.0, 0.0, 1.0)); ui.close(); }
             if ui.button("🌀 Distort / Lens").clicked() { snarl.insert_node(pos, DarkNode::default_distort(DistortType::Vignette, 0.5, 0.8, [0.0, 0.0])); ui.close(); }
             if ui.button("✂️ Crop / Mask").clicked() { snarl.insert_node(pos, DarkNode::CropMask { top: 0.0, bottom: 0.0, left: 0.0, right: 0.0, feather: 0.0 }); ui.close(); }

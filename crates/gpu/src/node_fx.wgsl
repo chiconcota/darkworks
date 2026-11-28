@@ -31,6 +31,7 @@ const OP_NODE_TWIRL: u32 = 110u;
 const OP_NODE_FIND_EDGES: u32 = 111u;
 const OP_NODE_NOISE_GRAIN: u32 = 112u;
 const OP_NODE_TURBULENT_DISPLACE: u32 = 113u;
+const OP_NODE_RESAMPLE_AREA: u32 = 114u;
 
 fn size() -> vec2<i32> {
     return vec2<i32>(i32(u.i0.y), i32(u.i0.z));
@@ -492,6 +493,28 @@ fn node_fx_px(@builtin(global_invocation_id) id: vec3<u32>) {
                 let nx = fbm3(cu, cv, evo);
                 let ny = fbm3(cu + 31.7, cv + 12.3, evo + 3.1);
                 out = sample_bilinear(pc.x + nx * amt, pc.y + ny * amt);
+            }
+        }
+        case OP_NODE_RESAMPLE_AREA: {
+            if u32(p.x) < u.i1.x || u32(p.x) >= u.i1.y || u32(p.y) < u.i1.z || u32(p.y) >= u.i1.w {
+                out = vec4(0.0);
+            } else {
+                let s = size();
+                let taps = clamp(i32(u.p1.w + 0.5), 2, 8);
+                let inv_n = 1.0 / f32(taps);
+                var acc = vec4(0.0);
+                for (var iy: i32 = 0; iy < taps; iy++) {
+                    let py = pc.y + (f32(iy) + 0.5) * inv_n - 0.5;
+                    for (var ix: i32 = 0; ix < taps; ix++) {
+                        let px = pc.x + (f32(ix) + 0.5) * inv_n - 0.5;
+                        let uu = u.p0.x * px + u.p0.z * py + u.p1.x;
+                        let vv = u.p0.y * px + u.p0.w * py + u.p1.y;
+                        if uu >= -1.0 && vv >= -1.0 && uu <= f32(s.x) + 1.0 && vv <= f32(s.y) + 1.0 {
+                            acc = acc + sample_bilinear(uu, vv);
+                        }
+                    }
+                }
+                out = (acc * (inv_n * inv_n)) * u.p1.z;
             }
         }
         default: {

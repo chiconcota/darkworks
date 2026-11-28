@@ -345,21 +345,31 @@ pub(crate) fn eval_item_graph_inner(
                 opacity,
                 flip_h,
                 flip_v,
+                uniform_scale,
+                skew,
+                skew_axis,
             } => {
                 let mut img = take_or_clone_texture(doc, &mut textures, &mut use_counts, id, 0, w, h);
                 let pos = modulated_vec2_add(doc, &sig_ctx, id, 1, *position);
                 let s_mod = modulated_scalar_mul(doc, &sig_ctx, id, 2, 1.0);
                 let rot_mod = modulated_scalar_add(doc, &sig_ctx, id, 3, *rotation_deg);
                 let op_mod = modulated_scalar_mul(doc, &sig_ctx, id, 4, *opacity).clamp(0.0, 1.0);
+                let sc = if *uniform_scale {
+                    [scale[0] * s_mod, scale[0] * s_mod]
+                } else {
+                    [scale[0] * s_mod, scale[1] * s_mod]
+                };
                 let res = apply_transform(
                     &mut img,
                     pos,
-                    [scale[0] * s_mod, scale[1] * s_mod],
+                    sc,
                     rot_mod,
                     *anchor,
                     op_mod,
                     *flip_h,
                     *flip_v,
+                    *skew,
+                    *skew_axis,
                     scale_xy,
                 );
                 recycle_f32(img.px);

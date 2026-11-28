@@ -344,6 +344,9 @@ pub fn render_node_body_for(node_id: NodeId, node: &mut DarkNode, ui: &mut Ui) {
                 opacity,
                 flip_h,
                 flip_v,
+                uniform_scale,
+                skew,
+                skew_axis,
             } => {
                 Grid::new(("xf_grid", node_ptr)).num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
                     ui.label("Pos X / Y:");
@@ -352,14 +355,32 @@ pub fn render_node_body_for(node_id: NodeId, node: &mut DarkNode, ui: &mut Ui) {
                         drag_val(ui, DragValue::new(&mut position[1]));
                     });
                     ui.end_row();
-                    ui.label("Scale X/Y:");
-                    ui.horizontal(|ui| {
-                        drag_val(ui, DragValue::new(&mut scale[0]).speed(0.01));
-                        drag_val(ui, DragValue::new(&mut scale[1]).speed(0.01));
-                    });
+                    if *uniform_scale {
+                        ui.label("Scale:");
+                        if drag_val(ui, DragValue::new(&mut scale[0]).speed(0.01)).changed() {
+                            scale[1] = scale[0];
+                        }
+                    } else {
+                        ui.label("Scale X/Y:");
+                        ui.horizontal(|ui| {
+                            drag_val(ui, DragValue::new(&mut scale[0]).speed(0.01));
+                            drag_val(ui, DragValue::new(&mut scale[1]).speed(0.01));
+                        });
+                    }
+                    ui.end_row();
+                    ui.label("Uniform:");
+                    if check_box(ui, uniform_scale, "Lock X = Y").changed() && *uniform_scale {
+                        scale[1] = scale[0];
+                    }
                     ui.end_row();
                     ui.label("Rotation:");
                     drag_val(ui, DragValue::new(rotation_deg).suffix("°"));
+                    ui.end_row();
+                    ui.label("Skew/Axis:");
+                    ui.horizontal(|ui| {
+                        drag_val(ui, DragValue::new(skew).range(-70.0..=70.0).speed(0.2).suffix("°"));
+                        drag_val(ui, DragValue::new(skew_axis).range(-360.0..=360.0).speed(0.5).suffix("°"));
+                    });
                     ui.end_row();
                     ui.label("Anchor:");
                     ui.horizontal(|ui| {

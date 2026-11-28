@@ -126,6 +126,22 @@ fn trace_linear_from(
                 rev_chain.push(cur);
                 cur = doc.source_for_pin(cur, 0)?.0;
             }
+            DarkNode::Blend { mode, .. } => {
+                // Chỉ pass-through lên GPU khi nối đúng 1 đầu (không có Mask); nối cả 2 đầu do `find_gpu_chain` xử lý riêng.
+                if doc.source_for_pin(cur, 2).is_some() {
+                    return None;
+                }
+                match (doc.source_for_pin(cur, 0), doc.source_for_pin(cur, 1)) {
+                    (Some((src, _)), None) => {
+                        cur = src;
+                    }
+                    (None, Some((src, _))) if *mode != BlendMode::Dissolve => {
+                        rev_chain.push(cur);
+                        cur = src;
+                    }
+                    _ => return None,
+                }
+            }
             _ => return None,
         }
     }
@@ -186,18 +202,6 @@ fn find_gpu_chain(
     trace_linear_from(doc, target_id, allow_all_below_root, self_track).map(|c| (c, None))
 }
 
-fn static_chain_ok(doc: &NodeGraphDoc, chain: &[usize]) -> bool {
-    chain.iter().all(|&id| {
-        let Some(entry) = doc.node(id) else { return false };
-        match &entry.node {
-            DarkNode::Transform2D { scale, .. } => {
-                doc.source_for_pin(id, 2).is_none() && scale[0].abs() >= 0.5 && scale[1].abs() >= 0.5
-            }
-            _ => true,
-        }
-    })
-}
-
 /// Kiểm tra nhanh đồ thị Clip có biên dịch trọn vẹn lên GPU không (dùng trong `layered_at`).
 pub(crate) fn can_plan_clip_graph(
     doc: &NodeGraphDoc,
@@ -211,8 +215,7 @@ pub(crate) fn can_plan_clip_graph(
         return false;
     };
     let step_ids: Vec<usize> = plan.steps.iter().map(|s| s.node_id).collect();
-    find_gpu_chain(doc, &step_ids, false, self_track, single_below_track)
-        .is_some_and(|(chain, _)| static_chain_ok(doc, &chain))
+    find_gpu_chain(doc, &step_ids, false, self_track, single_below_track).is_some()
 }
 
 /// Kiểm tra nhanh đồ thị AdjustmentLayer có biên dịch sang `PlanStep::Adjust` GPU không.
@@ -224,8 +227,7 @@ pub(crate) fn can_plan_adjustment_graph(doc: &NodeGraphDoc) -> bool {
         return false;
     };
     let step_ids: Vec<usize> = plan.steps.iter().map(|s| s.node_id).collect();
-    find_gpu_chain(doc, &step_ids, true, None, None)
-        .is_some_and(|(chain, blend)| blend.is_none() && static_chain_ok(doc, &chain))
+    find_gpu_chain(doc, &step_ids, true, None, None).is_some_and(|(_, blend)| blend.is_none())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -291,6 +293,17 @@ fn compile_chain_ops(
                     [sx, sy],
                     &mut ops,
                 )?;
+            }
+            DarkNode::Blend { opacity, .. } => {
+                let op = opacity.clamp(0.0, 1.0);
+                if (op - 1.0).abs() > 1e-4 {
+                    ops.push(FxOp::AlphaAdjust {
+                        opacity: op,
+                        ignore: false,
+                        invert: false,
+                        mask_only: false,
+                    });
+                }
             }
             _ => return None,
         }

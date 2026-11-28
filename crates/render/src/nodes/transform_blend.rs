@@ -10,7 +10,40 @@ use crate::blend::{Blend, composite};
 use crate::effects::gaussian_boxes;
 use crate::gpufx::{FxOp, Resample};
 use crate::image::Image;
+use crate::nodes::NodeFxOp;
 use crate::nodes::signals::{modulated_scalar_add, modulated_scalar_mul, modulated_vec2_add};
+
+#[allow(clippy::too_many_arguments)]
+fn build_transform_affine(
+    position: [f32; 2],
+    scale: [f32; 2],
+    rotation_deg: f32,
+    anchor: [f32; 2],
+    skew_deg: f32,
+    skew_axis_deg: f32,
+    w: usize,
+    h: usize,
+    scale_xy: (f32, f32),
+) -> Affine {
+    let px_pos = Vec2::new(
+        w as f64 * 0.5 + position[0] as f64 * scale_xy.0 as f64,
+        h as f64 * 0.5 + position[1] as f64 * scale_xy.1 as f64,
+    );
+    let px_anchor = Vec2::new(w as f64 * anchor[0] as f64, h as f64 * anchor[1] as f64);
+    let sk = if skew_deg.abs() > 1e-4 {
+        let t = (skew_deg as f64).clamp(-85.0, 85.0).to_radians().tan();
+        Affine::rotate_deg(skew_axis_deg as f64)
+            .then_apply(&Affine { a: 1.0, b: 0.0, c: t, d: 1.0, e: 0.0, f: 0.0 })
+            .then_apply(&Affine::rotate_deg(-(skew_axis_deg as f64)))
+    } else {
+        Affine::IDENTITY
+    };
+    Affine::translate(px_pos.x, px_pos.y)
+        .then_apply(&Affine::rotate_deg(rotation_deg as f64))
+        .then_apply(&sk)
+        .then_apply(&Affine::scale(scale[0] as f64, scale[1] as f64))
+        .then_apply(&Affine::translate(-px_anchor.x, -px_anchor.y))
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_transform(
@@ -22,6 +55,8 @@ pub(crate) fn apply_transform(
     opacity: f32,
     flip_h: bool,
     flip_v: bool,
+    skew: f32,
+    skew_axis: f32,
     scale_xy: (f32, f32),
 ) -> Image {
     if flip_h {
@@ -31,17 +66,7 @@ pub(crate) fn apply_transform(
         FxOp::VFlip.apply(img);
     }
     let (w, h) = (img.w, img.h);
-    let px_pos = Vec2::new(
-        w as f64 * 0.5 + position[0] as f64 * scale_xy.0 as f64,
-        h as f64 * 0.5 + position[1] as f64 * scale_xy.1 as f64,
-    );
-    let px_anchor = Vec2::new(w as f64 * anchor[0] as f64, h as f64 * anchor[1] as f64);
-    let m = Affine::motion(
-        px_pos,
-        Vec2::new(scale[0] as f64, scale[1] as f64),
-        rotation_deg as f64,
-        px_anchor,
-    );
+    let m = build_transform_affine(position, scale, rotation_deg, anchor, skew, skew_axis, w, h, scale_xy);
     let mut out = img.transformed(w, h, &m);
     if (opacity - 1.0).abs() > 1e-4 {
         out.scale_alpha(opacity.clamp(0.0, 1.0));
@@ -255,6 +280,9 @@ pub(crate) fn push_transform_gpu_ops(
         opacity,
         flip_h,
         flip_v,
+        uniform_scale,
+        skew,
+        skew_axis,
     } = node
     else {
         return Some(());
@@ -269,22 +297,42 @@ pub(crate) fn push_transform_gpu_ops(
     let s_mod = modulated_scalar_mul(doc, sig_ctx, id, 2, 1.0);
     let rot_mod = modulated_scalar_add(doc, sig_ctx, id, 3, *rotation_deg);
     let op_mod = modulated_scalar_mul(doc, sig_ctx, id, 4, *opacity).clamp(0.0, 1.0);
-    let sc = [scale[0] * s_mod, scale[1] * s_mod];
-    if sc[0].abs() < 0.5 || sc[1].abs() < 0.5 {
-        return None;
+    let sc = if *uniform_scale {
+        [scale[0] * s_mod, scale[0] * s_mod]
+    } else {
+        [scale[0] * s_mod, scale[1] * s_mod]
+    };
+    if sc[0].abs() < 1e-4 || sc[1].abs() < 1e-4 {
+        ops.push(FxOp::AlphaAdjust { opacity: 0.0, ignore: false, invert: false, mask_only: false });
+        return Some(());
     }
     let [lw, lh] = size;
-    let [sx, sy] = seq_scale;
-    let px_pos = Vec2::new(
-        lw as f64 * 0.5 + pos[0] as f64 * sx as f64,
-        lh as f64 * 0.5 + pos[1] as f64 * sy as f64,
-    );
-    let px_anchor = Vec2::new(lw as f64 * anchor[0] as f64, lh as f64 * anchor[1] as f64);
-    let m = Affine::motion(px_pos, Vec2::new(sc[0] as f64, sc[1] as f64), rot_mod as f64, px_anchor);
-    ops.push(FxOp::Resample(Resample {
-        inv: m.inverse(),
-        rect: [0, lw as u32, 0, lh as u32],
-        opacity: op_mod,
-    }));
+    let m = build_transform_affine(pos, sc, rot_mod, *anchor, *skew, *skew_axis, lw, lh, (seq_scale[0], seq_scale[1]));
+    let inv = m.inverse();
+    let b = m.bounds(&filmcraft_geom::Rect::new(0.0, 0.0, lw as f64, lh as f64));
+    let rect = [
+        (b.x.floor().max(0.0) as usize).min(lw) as u32,
+        (b.right().ceil().max(0.0) as usize).min(lw) as u32,
+        (b.y.floor().max(0.0) as usize).min(lh) as u32,
+        (b.bottom().ceil().max(0.0) as usize).min(lh) as u32,
+    ];
+    let msx = (m.a * m.a + m.b * m.b).sqrt();
+    let msy = (m.c * m.c + m.d * m.d).sqrt();
+    let minify = 1.0 / msx.min(msy).max(1e-6);
+    if minify > 2.01 && lw >= 4 && lh >= 4 {
+        if let Some(inv_m) = inv {
+            let taps = ((minify - 1e-4).ceil() as u32).clamp(2, 8);
+            ops.push(FxOp::Node(NodeFxOp::ResampleArea {
+                inv: [inv_m.a as f32, inv_m.b as f32, inv_m.c as f32, inv_m.d as f32, inv_m.e as f32, inv_m.f as f32],
+                rect,
+                opacity: op_mod,
+                taps,
+            }));
+        } else {
+            ops.push(FxOp::AlphaAdjust { opacity: 0.0, ignore: false, invert: false, mask_only: false });
+        }
+    } else {
+        ops.push(FxOp::Resample(Resample { inv, rect, opacity: op_mod }));
+    }
     Some(())
 }

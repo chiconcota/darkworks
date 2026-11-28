@@ -3,7 +3,7 @@ use crate::image::Image;
 use crate::nodes::node_fx_ops::{KEYER_OUT_ALPHA, NodeFxOp, keyer_output_code};
 use crate::plan::{DeviceCaps, FramePlan, PlanStep, execute_cpu, plan_frame};
 use crate::{SharedSource, SourceMap};
-use darkworks_node_graph_core::{BlendMode, DistortType, KeyerOutput, NodeEntry, NodeGraphDoc, NodeWire};
+use darkworks_node_graph_core::{BlendMode, DistortType, KeyerOutput, NodeEntry, NodeGraphDoc, NodeWire, TimeMode};
 use filmcraft_media::generators::GeneratorSource;
 use filmcraft_media::{Generator, MediaSource};
 use filmcraft_project::{ItemKind, Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
@@ -388,5 +388,191 @@ fn video_input_matching_clip_track_with_blend_v1_compiles_to_gpu_layers() {
             FramePlan::Image(_) => "CPU Image",
             _ => "other",
         }),
+    }
+}
+
+#[test]
+fn single_wired_blend_stays_on_gpu_layers() {
+    let mut p = Project::new("single-blend-gpu");
+    let mut map = SourceMap::default();
+    let red_bg = add_matte(&mut p, &mut map, [1.0, 0.0, 0.0, 1.0]);
+    let green_fg = add_matte(&mut p, &mut map, [0.0, 1.0, 0.0, 1.0]);
+    let seq = p.new_sequence(
+        "s",
+        SequenceSettings { width: 32, height: 32, frame_rate: FrameRate::FPS_24, ..Default::default() },
+        2,
+        2,
+        None,
+    );
+    let r = FrameRate::FPS_24;
+    let ti_bg = p.make_track_item(red_bg, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, r.tick_of(24)), r).unwrap();
+    p.sequence_mut(seq).unwrap().video_tracks[0].items.push(ti_bg);
+
+    // Case 1: VideoInput(Auto) -> Transform2D(0.5) -> Keyer -> Blend(Background only) -> Output
+    let mut ti_fg = p.make_track_item(green_fg, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, r.tick_of(24)), r).unwrap();
+    let mut doc_bg_only = NodeGraphDoc::new();
+    doc_bg_only.nodes = vec![
+        NodeEntry { id: 1, node: DarkNode::VideoInput { track_name: "Auto".into() }, pos: [0.0, 0.0], custom_title: None },
+        NodeEntry {
+            id: 2,
+            node: DarkNode::Transform2D {
+                position: [0.0, 0.0],
+                scale: [0.5, 0.5],
+                rotation_deg: 0.0,
+                anchor: [0.5, 0.5],
+                opacity: 1.0,
+                flip_h: false,
+                flip_v: false,
+                uniform_scale: true,
+                skew: 0.0,
+                skew_axis: 0.0,
+            },
+            pos: [100.0, 0.0],
+            custom_title: None,
+        },
+        NodeEntry { id: 3, node: DarkNode::default_keyer(), pos: [200.0, 0.0], custom_title: None },
+        NodeEntry { id: 4, node: DarkNode::Blend { mode: BlendMode::Normal, opacity: 1.0 }, pos: [300.0, 0.0], custom_title: None },
+        NodeEntry { id: 5, node: DarkNode::Output, pos: [400.0, 0.0], custom_title: None },
+    ];
+    doc_bg_only.wires = vec![
+        NodeWire { out_node: 1, out_pin: 0, in_node: 2, in_pin: 0 },
+        NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 0 },
+        NodeWire { out_node: 3, out_pin: 0, in_node: 4, in_pin: 0 },
+        NodeWire { out_node: 4, out_pin: 0, in_node: 5, in_pin: 0 },
+    ];
+    ti_fg.node_graph = Some(Box::new(doc_bg_only));
+    p.sequence_mut(seq).unwrap().video_tracks[1].items.push(ti_fg);
+
+    let plan1 = plan_frame(&p, seq, Tick(1000), RenderOptions::default(), DeviceCaps::ALL, &map);
+    match &plan1 {
+        FramePlan::Layers { layers, .. } => {
+            assert_eq!(layers.len(), 2);
+            let ops = &layers[1].fx.as_ref().expect("gpu fx").ops;
+            assert!(matches!(ops.as_slice(), [FxOp::Resample(_), FxOp::Node(NodeFxOp::ChromaKeyPro { .. })]));
+        }
+        _ => panic!("expected GPU FramePlan::Layers for Blend(bg only)"),
+    }
+
+    // Case 2: VideoInput(Auto) -> Keyer -> Blend(Foreground only, opacity 0.6) -> Output
+    let mut doc_fg_only = NodeGraphDoc::new();
+    doc_fg_only.nodes = vec![
+        NodeEntry { id: 1, node: DarkNode::VideoInput { track_name: "Auto".into() }, pos: [0.0, 0.0], custom_title: None },
+        NodeEntry { id: 2, node: DarkNode::default_keyer(), pos: [100.0, 0.0], custom_title: None },
+        NodeEntry { id: 3, node: DarkNode::Blend { mode: BlendMode::Screen, opacity: 0.6 }, pos: [200.0, 0.0], custom_title: None },
+        NodeEntry { id: 4, node: DarkNode::Output, pos: [300.0, 0.0], custom_title: None },
+    ];
+    doc_fg_only.wires = vec![
+        NodeWire { out_node: 1, out_pin: 0, in_node: 2, in_pin: 0 },
+        NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 1 },
+        NodeWire { out_node: 3, out_pin: 0, in_node: 4, in_pin: 0 },
+    ];
+    p.sequence_mut(seq).unwrap().video_tracks[1].items[0].node_graph = Some(Box::new(doc_fg_only));
+
+    let plan2 = plan_frame(&p, seq, Tick(1000), RenderOptions::default(), DeviceCaps::ALL, &map);
+    match &plan2 {
+        FramePlan::Layers { layers, .. } => {
+            assert_eq!(layers.len(), 2);
+            let ops = &layers[1].fx.as_ref().expect("gpu fx").ops;
+            assert!(matches!(
+                ops.as_slice(),
+                [FxOp::Node(NodeFxOp::ChromaKeyPro { .. }), FxOp::AlphaAdjust { opacity, .. }] if (*opacity - 0.6).abs() < 1e-5
+            ));
+        }
+        _ => panic!("expected GPU FramePlan::Layers for Blend(fg only)"),
+    }
+}
+
+#[test]
+fn transform_small_scale_scale_mod_and_skew_stay_on_gpu() {
+    let mut p = Project::new("transform-gpu-upgrade");
+    let mut map = SourceMap::default();
+    let src = add_matte(&mut p, &mut map, [0.2, 0.6, 0.9, 1.0]);
+    let seq = p.new_sequence(
+        "s",
+        SequenceSettings { width: 32, height: 32, frame_rate: FrameRate::FPS_24, ..Default::default() },
+        1,
+        1,
+        None,
+    );
+    let r = FrameRate::FPS_24;
+    let mut ti = p.make_track_item(src, TrackKind::Video, Tick::ZERO, TimeRange::new(Tick::ZERO, r.tick_of(24)), r).unwrap();
+
+    // 1. Scale = 0.25 (< 0.5) + uniform_scale + skew -> ResampleArea GPU
+    let mut doc_small = NodeGraphDoc::new();
+    doc_small.nodes = vec![
+        NodeEntry { id: 1, node: DarkNode::VideoInput { track_name: "Auto".into() }, pos: [0.0, 0.0], custom_title: None },
+        NodeEntry {
+            id: 2,
+            node: DarkNode::Transform2D {
+                position: [2.0, -2.0],
+                scale: [0.25, 0.9],
+                rotation_deg: 15.0,
+                anchor: [0.5, 0.5],
+                opacity: 0.9,
+                flip_h: false,
+                flip_v: false,
+                uniform_scale: true,
+                skew: 12.0,
+                skew_axis: 30.0,
+            },
+            pos: [120.0, 0.0],
+            custom_title: None,
+        },
+        NodeEntry { id: 3, node: DarkNode::Output, pos: [240.0, 0.0], custom_title: None },
+    ];
+    doc_small.wires = vec![
+        NodeWire { out_node: 1, out_pin: 0, in_node: 2, in_pin: 0 },
+        NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 0 },
+    ];
+    ti.node_graph = Some(Box::new(doc_small));
+    p.sequence_mut(seq).unwrap().video_tracks[0].items.push(ti);
+
+    let plan_small = plan_frame(&p, seq, Tick(1000), RenderOptions::default(), DeviceCaps::ALL, &map);
+    match &plan_small {
+        FramePlan::Layers { layers, .. } => {
+            assert_eq!(layers.len(), 1);
+            let ops = &layers[0].fx.as_ref().expect("gpu fx").ops;
+            assert!(matches!(
+                ops.as_slice(),
+                [FxOp::Node(NodeFxOp::ResampleArea { taps, .. })] if *taps >= 4
+            ));
+        }
+        _ => panic!("expected GPU FramePlan::Layers for Transform2D scale < 0.5"),
+    }
+
+    // 2. TimeDriver -> Scale Mod (pin 2) cũng phải chạy GPU
+    let mut doc_mod = NodeGraphDoc::new();
+    doc_mod.nodes = vec![
+        NodeEntry { id: 1, node: DarkNode::VideoInput { track_name: "Auto".into() }, pos: [0.0, 0.0], custom_title: None },
+        NodeEntry {
+            id: 2,
+            node: DarkNode::TimeDriver {
+                speed: 1.0,
+                mode: TimeMode::Linear,
+                amplitude: 0.1,
+                offset: 0.2,
+                vec2_axis: [0.0, 0.0],
+            },
+            pos: [0.0, 100.0],
+            custom_title: None,
+        },
+        NodeEntry { id: 3, node: DarkNode::default_transform(), pos: [140.0, 0.0], custom_title: None },
+        NodeEntry { id: 4, node: DarkNode::Output, pos: [280.0, 0.0], custom_title: None },
+    ];
+    doc_mod.wires = vec![
+        NodeWire { out_node: 1, out_pin: 0, in_node: 3, in_pin: 0 },
+        NodeWire { out_node: 2, out_pin: 0, in_node: 3, in_pin: 2 },
+        NodeWire { out_node: 3, out_pin: 0, in_node: 4, in_pin: 0 },
+    ];
+    p.sequence_mut(seq).unwrap().video_tracks[0].items[0].node_graph = Some(Box::new(doc_mod));
+
+    let plan_mod = plan_frame(&p, seq, r.tick_of(12), RenderOptions::default(), DeviceCaps::ALL, &map);
+    match &plan_mod {
+        FramePlan::Layers { layers, .. } => {
+            assert_eq!(layers.len(), 1);
+            let ops = &layers[0].fx.as_ref().expect("gpu fx").ops;
+            assert!(matches!(ops.as_slice(), [FxOp::Node(NodeFxOp::ResampleArea { .. })]));
+        }
+        _ => panic!("expected GPU FramePlan::Layers for Transform2D with Scale Mod"),
     }
 }

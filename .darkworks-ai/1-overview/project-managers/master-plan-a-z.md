@@ -91,7 +91,7 @@ flowchart TD
   - `Node Shape / Solid`: Vẽ nền hộp bo góc, solid matte cho banner/lower-third.
   - `Node Time / Speed Driver`: Bộ đếm thời gian, tốc độ cuộn ngang Ticker/Marquee, sóng LFO.
   - `Node Crop / Mask`: Cắt xén vùng hiển thị.
-  - `Node Transform 2D`: Vị trí X/Y, Scale, Rotation, Anchor point, Opacity.
+  - `Node Transform 2D`: Vị trí X/Y, Scale X/Y + `Uniform Scale` (khóa X=Y), Rotation, `Skew` / `Skew Axis`, Anchor point, Opacity, `Flip H/V`; chạy 100% GPU kể cả khi thu nhỏ `< 0.5` (`ResampleArea`) hoặc nối `Scale Mod`.
   - `Node Blend / Mix`: Hòa trộn 2 luồng hình ảnh với 26 chế độ blend (Multiply, Screen, Overlay...).
   - `Node Color Grade`: Chỉnh màu cơ bản (Exposure, Contrast, Temp, Tint, Saturation).
   - `Node Keyer`: Tách phông xanh Ultra Key thời gian thực.
@@ -140,6 +140,7 @@ flowchart TD
   - Cho phép **1 đường Keyframe lái nhiều Node cùng lúc** qua các socket `Mod` (`Pos Mod`, `Scale Mod`, `Rot Mod`, `Opacity Mod`, `Intensity Mod`, `Progress Mod`) và kết hợp tự do với `TimeDriver` / `AudioReactor` (ví dụ envelope vào/ra mượt nhân với nhịp bass).
 - [ ] **Task 4.7 [Đồng Bộ Transform Handles, Kho Video Preset Lưu Sẵn & Ẩn `Effect Controls` / `Video Effects` Cũ]:**
   - Nối thao tác kéo thả khung Transform trên Program Monitor (`transform_handles.rs`) trực tiếp vào `Transform2D` Node (hỗ trợ đặt keyframe `Position`/`Scale`/`Rotation` thẳng vào Node Graph).
+  - Nâng cấp `CropMask` theo chế độ kép (**Cách 1**: `Edge Crop` 4 cạnh + `Bezier / Pen Mask` nối tool vẽ bút/Ellipse/Polygon trực tiếp trên Program Monitor từ `masks.rs` & `mask.wgsl`, bổ sung chân `Matte Out` để cắm sang `Blend` / `Ultra Keyer`).
   - Đóng gói trọn bộ hiệu ứng Video & Color Grading phổ biến của FilmCraft thành kho **Node Graph Presets (`.preset.json`) lưu sẵn** (Blur, Glow, Vignette, Color Presets, Blur/Distort, Motion Pop-in/out…).
   - Ẩn tab `Effect Controls` và mục `Video Effects` cũ khỏi workspace UI mặc định để chuyển người dùng sang quy trình **Thư viện Node Presets + Node Graph** (vẫn giữ Audio FX & Transition điểm nối cho tới Phase 5).
 - [ ] **Task 4.8 [Multi-Branch GPU DAG Texture Pool & Zero-Readback `CustomWgsl`]:**
@@ -187,6 +188,17 @@ flowchart TD
   - Đóng gói ứng dụng thành file thực thi duy nhất kèm desktop launcher và icon.
   - Chạy quy trình `/release-github` phát hành bản `v0.1.0` lên GitHub Release kèm Changelog chuẩn 3 tầng (What's New / Improvements / Fixes).
 - **Tiêu chuẩn nghiệm thu (DoD 6):** Xuất video 1080p 60fps mượt mà, phát chuẩn trên VLC/YouTube; binary chạy được trên mọi distro Linux (Ubuntu, Arch, Fedora).
+
+---
+
+## ⚪ GIAI ĐOẠN 7 (POST-MILESTONE / SAU PRODUCTION): MỞ RỘNG HIỆU ỨNG CHUYÊN SÂU (PHASE 7+)
+**Trạng thái:** ⚪ **KẾ HOẠCH SAU MILESTONE PRODUCTION**  
+**Mục tiêu:** Bổ sung các Atomic Nodes chuyên sâu đòi hỏi toán học/pipeline riêng sau khi hoàn tất Milestone phát hành chính thức (Phase 1–6).
+
+- [ ] **Task 7.1 [Atomic Node `Transform 3D` (Lightworks 3D DVE / Perspective)]:**
+  - Tách bạch thành Atomic Node độc lập với `Transform 2D` (dùng phép chiếu phối cảnh Homography 3×3 thay cho Affine 2×3).
+  - Tham số đầy đủ: `Pos X/Y/Z` (xa/gần camera), `Rot X (Tilt)`, `Rot Y (Swivel)`, `Rot Z (Roll)`, `Pivot X/Y/Z`, `Perspective (FOV)`, `Hide Backface`, cùng các socket `Mod` điều khiển theo `TimeDriver` / `AudioReactor` / `KeyframeCurve`.
+  - Tái sử dụng nền toán học từ `basic_3d` (`crates/render/src/effects.rs`) & `rotate_3d` (`crates/render/src/vfx/distort.rs`), biên dịch sang shader Compute WGSL trong `crates/gpu/src/node_fx.wgsl` để chạy 100% GPU 60fps.
 
 ---
 

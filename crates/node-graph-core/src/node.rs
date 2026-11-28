@@ -165,6 +165,12 @@ pub enum DarkNode {
         opacity: f32,
         flip_h: bool,
         flip_v: bool,
+        #[serde(default)]
+        uniform_scale: bool,
+        #[serde(default)]
+        skew: f32,
+        #[serde(default)]
+        skew_axis: f32,
     },
     CropMask {
         top: f32,
@@ -370,6 +376,23 @@ impl DarkNode {
             spill_luma: default_keyer_spill_luma(),
             luma_threshold: default_keyer_luma_threshold(),
             luma_cutoff: default_keyer_luma_cutoff(),
+        }
+    }
+
+    /// Khởi tạo `Transform2D` mặc định (khóa `Uniform Scale` theo chuẩn dựng phim).
+    #[must_use]
+    pub fn default_transform() -> Self {
+        Self::Transform2D {
+            position: [0.0, 0.0],
+            scale: [1.0, 1.0],
+            rotation_deg: 0.0,
+            anchor: [0.5, 0.5],
+            opacity: 1.0,
+            flip_h: false,
+            flip_v: false,
+            uniform_scale: true,
+            skew: 0.0,
+            skew_axis: 0.0,
         }
     }
 

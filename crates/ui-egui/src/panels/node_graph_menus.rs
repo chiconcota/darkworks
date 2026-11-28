@@ -63,15 +63,7 @@ pub fn render_add_node_menu(ui: &mut Ui, state: &mut NodeGraphState) {
         ui.label(egui::RichText::new("--- 3. BIẾN HÌNH & HÒA TRỘN ---").weak());
         if ui.button("📐 Transform 2D (Flip H/V)").clicked() {
             state.push_undo();
-            state.snarl.insert_node(Pos2::new(200.0, 100.0), DarkNode::Transform2D {
-                position: [0.0, 0.0],
-                scale: [1.0, 1.0],
-                rotation_deg: 0.0,
-                anchor: [0.5, 0.5],
-                opacity: 1.0,
-                flip_h: false,
-                flip_v: false,
-            });
+            state.snarl.insert_node(Pos2::new(200.0, 100.0), DarkNode::default_transform());
             ui.close();
         }
         if ui.button("✂️ Crop / Mask").clicked() {

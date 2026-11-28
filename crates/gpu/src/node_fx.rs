@@ -19,6 +19,7 @@ const OP_NODE_TWIRL: u32 = 110;
 const OP_NODE_FIND_EDGES: u32 = 111;
 const OP_NODE_NOISE_GRAIN: u32 = 112;
 const OP_NODE_TURBULENT_DISPLACE: u32 = 113;
+const OP_NODE_RESAMPLE_AREA: u32 = 114;
 
 fn node_step(code: u32, i1: [u32; 4], p: &[f32]) -> Step {
     let mut s = step(code, i1, p);
@@ -185,6 +186,13 @@ pub(crate) fn push_node_steps(op: &NodeFxOp, w: u32, h: u32, out: &mut Vec<Step>
         }
         NodeFxOp::TurbulentDisplace { amt, size, ox, oy, evo } => {
             out.push(node_step(OP_NODE_TURBULENT_DISPLACE, [0; 4], &[*amt, *size, *ox, *oy, *evo]));
+        }
+        NodeFxOp::ResampleArea { inv, rect, opacity, taps } => {
+            out.push(node_step(
+                OP_NODE_RESAMPLE_AREA,
+                *rect,
+                &[inv[0], inv[1], inv[2], inv[3], inv[4], inv[5], *opacity, *taps as f32],
+            ));
         }
     }
 }

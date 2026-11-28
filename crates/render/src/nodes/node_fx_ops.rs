@@ -11,7 +11,7 @@ use crate::effects::{box_blur, dec, enc, gaussian_boxes, mosaic};
 use crate::image::Image;
 use crate::nodes::node_fx_distort_cpu::{
     chromatic_aberration_cpu, find_edges_cpu, lens_distort_cpu, noise_grain_cpu, radial_zoom_cpu,
-    ripple_wave_cpu, turbulent_displace_cpu, twirl_cpu,
+    resample_area_cpu, ripple_wave_cpu, turbulent_displace_cpu, twirl_cpu,
 };
 
 pub const KEYER_OUT_COMPOSITE: u8 = 0;
@@ -104,6 +104,12 @@ pub enum NodeFxOp {
         oy: f32,
         evo: f32,
     },
+    ResampleArea {
+        inv: [f32; 6],
+        rect: [u32; 4],
+        opacity: f32,
+        taps: u32,
+    },
 }
 
 impl NodeFxOp {
@@ -173,6 +179,13 @@ impl NodeFxOp {
             Self::FindEdges { blend, .. } => blend.is_finite(),
             Self::NoiseGrain { amt, grain, color_mix, .. } => fin(&[*amt, *grain, *color_mix]) && *grain >= 1.0,
             Self::TurbulentDisplace { amt, size, ox, oy, evo } => fin(&[*amt, *size, *ox, *oy, *evo]) && *size >= 1.0,
+            Self::ResampleArea { inv, rect, opacity, taps } => {
+                rect[0] <= rect[1]
+                    && rect[2] <= rect[3]
+                    && (2..=8).contains(taps)
+                    && opacity.is_finite()
+                    && inv.iter().all(|v| v.is_finite() && v.abs() < 1e7)
+            }
         }
     }
 
@@ -244,6 +257,7 @@ impl NodeFxOp {
             Self::FindEdges { invert, blend } => find_edges_cpu(img, *invert, *blend),
             Self::NoiseGrain { amt, grain, color_mix, seed } => noise_grain_cpu(img, *amt, *grain, *color_mix, *seed),
             Self::TurbulentDisplace { amt, size, ox, oy, evo } => turbulent_displace_cpu(img, *amt, *size, *ox, *oy, *evo),
+            Self::ResampleArea { inv, rect, opacity, taps } => resample_area_cpu(img, *inv, *rect, *opacity, *taps),
         }
     }
 }

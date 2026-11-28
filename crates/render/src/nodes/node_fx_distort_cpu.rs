@@ -277,3 +277,51 @@ pub(crate) fn turbulent_displace_cpu(img: &mut Image, amt: f32, size: f32, ox: f
         }
     });
 }
+
+/// Lấy mẫu supersampled `taps × taps` theo ma trận nghịch đảo cho thu nhỏ `< 0.5` (khớp 1:1 với GPU).
+pub(crate) fn resample_area_cpu(
+    img: &mut Image,
+    inv: [f32; 6],
+    rect: [u32; 4],
+    opacity: f32,
+    taps: u32,
+) {
+    let src = img.clone();
+    let (w, h) = (img.w, img.h);
+    let n = taps.clamp(2, 8);
+    let inv_n = 1.0 / n as f32;
+    let norm = inv_n * inv_n;
+    let [x0, x1, y0, y1] = rect.map(|v| v as usize);
+    img.px.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
+        if y < y0 || y >= y1 {
+            row.fill(0.0);
+            return;
+        }
+        let cy = y as f32 + 0.5;
+        for x in 0..w {
+            if x < x0 || x >= x1 {
+                row[x * 4..x * 4 + 4].fill(0.0);
+                continue;
+            }
+            let cx = x as f32 + 0.5;
+            let mut acc = [0.0f32; 4];
+            for iy in 0..n {
+                let py = cy + (iy as f32 + 0.5) * inv_n - 0.5;
+                for ix in 0..n {
+                    let px = cx + (ix as f32 + 0.5) * inv_n - 0.5;
+                    let uu = inv[0] * px + inv[2] * py + inv[4];
+                    let vv = inv[1] * px + inv[3] * py + inv[5];
+                    if uu >= -1.0 && vv >= -1.0 && uu <= w as f32 + 1.0 && vv <= h as f32 + 1.0 {
+                        let s = src.sample_bilinear(uu, vv);
+                        for k in 0..4 {
+                            acc[k] += s[k];
+                        }
+                    }
+                }
+            }
+            for k in 0..4 {
+                row[x * 4 + k] = acc[k] * norm * opacity;
+            }
+        }
+    });
+}

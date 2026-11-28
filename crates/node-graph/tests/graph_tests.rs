@@ -197,6 +197,9 @@ fn test_dag_evaluator_topological_sort_and_signals() {
             opacity: 1.0,
             flip_h: false,
             flip_v: false,
+            uniform_scale: true,
+            skew: 0.0,
+            skew_axis: 0.0,
         },
     );
 
@@ -236,15 +239,7 @@ fn test_dag_evaluator_cycle_detection() {
 
     let node_a = snarl.insert_node(
         Pos2::new(0.0, 0.0),
-        DarkNode::Transform2D {
-            position: [0.0, 0.0],
-            scale: [1.0, 1.0],
-            rotation_deg: 0.0,
-            anchor: [0.5, 0.5],
-            opacity: 1.0,
-            flip_h: false,
-            flip_v: false,
-        },
+        DarkNode::default_transform(),
     );
 
     let node_b = snarl.insert_node(
@@ -257,6 +252,9 @@ fn test_dag_evaluator_cycle_detection() {
             opacity: 1.0,
             flip_h: false,
             flip_v: false,
+            uniform_scale: true,
+            skew: 0.0,
+            skew_axis: 0.0,
         },
     );
 
@@ -373,6 +371,9 @@ fn test_18_atomic_nodes_creation_and_sockets() {
             opacity: 1.0,
             flip_h: true,
             flip_v: false,
+            uniform_scale: true,
+            skew: 0.0,
+            skew_axis: 0.0,
         },
         DarkNode::CropMask {
             top: 0.1,
@@ -465,6 +466,9 @@ fn test_color_grade_invert_title_and_transform_flips() {
         opacity: 1.0,
         flip_h: true,
         flip_v: true,
+        uniform_scale: true,
+        skew: 0.0,
+        skew_axis: 0.0,
     };
     if let DarkNode::Transform2D { flip_h, flip_v, .. } = transform_flipped {
         assert!(flip_h);

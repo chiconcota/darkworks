@@ -1099,6 +1099,16 @@ fn node_fx_pro_keyer_and_distort_match_cpu_exactly() {
             NodeFxOp::TurbulentDisplace { amt: 8.0, size: 16.0, ox: 0.5, oy: 0.2, evo: 0.8 },
             false,
         ),
+        (
+            "resample_area",
+            NodeFxOp::ResampleArea {
+                inv: [4.0, 0.0, 0.0, 4.0, -96.0, -72.0],
+                rect: [20, 44, 16, 32],
+                opacity: 0.85,
+                taps: 4,
+            },
+            false,
+        ),
     ];
 
     for (name, node_op, step_fn) in cases {
